@@ -1,0 +1,37 @@
+{
+  "name": "bs-virtualdom",
+  "version": "1.0.0-dev",
+  "description": "Virtual DOM library implemented in BuckleSript",
+  "scripts": {
+    "build": "bsb -make-world",
+    "start": "bsb -make-world -w",
+    "clean": "bsb -clean-world",
+    "test": "exit 0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/malthe/bs-virtualdom.git"
+  },
+  "keywords": [
+    "virtual dom",
+    "bucklescript"
+  ],
+  "author": "Malthe Borch <mborch@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/malthe/bs-virtualdom/issues"
+  },
+  "homepage": "https://github.com/malthe/bs-virtualdom#readme",
+  "devDependencies": {
+    "bs-platform": "^4.0.7",
+    "bs-webapi": "^0.13.0",
+    "rollup": "^0.65.0",
+    "rollup-plugin-commonjs": "^9.1.6",
+    "rollup-plugin-node-resolve": "^3.3.0",
+    "rollup-plugin-terser": "^1.0.1"
+  },
+  "peerDependencies": {
+    "bs-webapi": "^0.13.0",
+    "bs-platform": "^4.0.7"
+  }
+}

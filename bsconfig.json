@@ -1,0 +1,10 @@
+{
+  "name": "bs-virtualdom",
+  "sources": {"dir" : "src"},
+  "bs-dependencies": [
+    "bs-webapi"
+  ],
+  "package-specs": [{"module": "es6", "in-source": true}],
+  "suffix": ".bs.js",
+  "bsc-flags": ["-color", "always", "-w", "-40+6+7+27+32..39+44+45", "-w @8"]
+}
