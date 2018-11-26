@@ -259,9 +259,14 @@ let apply vnode element (directives, events) = {
   directives;
 }
 
-let findNextEventTarget element mask directives update =
+let rec findNextEventTarget element mask directives update =
   let length = Array.length directives in
   let rec go j =
+    let next d =
+      match findNextEventTarget element mask d update with
+        Some _ as result -> result
+      | None -> go (j + 1)
+    in
     if j < length then
       match Array.get directives j with
         Attached { element = element'; events; directives }
@@ -270,6 +275,8 @@ let findNextEventTarget element mask directives update =
           Some (update, directives)
         else
           None
+      | Thunk (_, _, Some d) -> next [| d |]
+      | Wedge d -> next d
       | _ -> go (j + 1)
     else
       None
