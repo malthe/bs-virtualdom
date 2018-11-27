@@ -194,44 +194,6 @@ let rec getNextSibling = function
     g @@ Array.length directives
   | _ -> None
 
-let rec search f directives =
-  let length = Array.length directives in
-  let rec go i =
-    if i < length then
-      let d = Array.get directives i in
-      match f d with
-        Some x -> Some x
-      | None -> (
-          let g directives =
-            match search f directives with
-              Some x -> Some x
-            | None -> go (i + 1)
-          in
-          match d with
-            Wedge directives -> g directives
-          | Thunk (_, _, Some d) -> g [| d |]
-          | _ -> go (i + 1)
-        )
-    else
-      None
-  in
-  go 0
-
-let rec notify i event update directives =
-  let length = Array.length directives in
-  let rec go j =
-    if j < length then
-      match Array.get directives j with
-      | EventListener (k, f) when i = k ->
-        update (f (unsafe_identity event))
-      | Thunk (_, _, Some d) -> notify i event update [| d |]
-      | Wedge d -> notify i event update d
-      | _ -> go (j + 1)
-    else
-      ()
-  in
-  go 0
-
 let sameKeyOrSelector key namespace selector vnode =
   key = vnode.key &&
   namespace = vnode.namespace &&
@@ -282,15 +244,31 @@ let rec findNextEventTarget element mask directives update =
       None
   in go 0
 
-let rec dispatch i event update directives =
-  function
-    [] -> notify i event update directives
-  | x::xs ->
-    let mask = 1 lsl i in
-    match findNextEventTarget x mask directives update with
-      Some (update, directives) ->
-      dispatch i event update directives xs
-    | None -> ()
+let rec dispatch i event update =
+  let rec notify directives =
+    let length = Array.length directives in
+    let rec go j =
+      if j < length then
+        match Array.get directives j with
+        | EventListener (k, f) when i = k ->
+          update (f (unsafe_identity event))
+        | Thunk (_, _, Some d) -> notify [| d |]
+        | Wedge d -> notify d
+        | _ -> go (j + 1)
+      else
+        ()
+    in
+    go 0
+  in
+  fun directives ->
+    function
+      [] -> notify directives
+    | x::xs ->
+      let mask = 1 lsl i in
+      match findNextEventTarget x mask directives update with
+        Some (update, directives) ->
+        dispatch i event update directives xs
+      | None -> ()
 
 and patch ?remove:(removeTransition=false) element defaultNamespace =
   let rec cleanup keys = function
@@ -672,7 +650,30 @@ and removeVNodeNested parent directives callback =
   in
   count := go parent directives
 
-and removeVNodeOwnTransition element namespace directives callback =
+and removeVNodeOwnTransition =
+  let rec search f directives =
+    let length = Array.length directives in
+    let rec go i =
+      if i < length then
+        let d = Array.get directives i in
+        match f d with
+          Some x -> Some x
+        | None -> (
+            let g directives =
+              match search f directives with
+                Some x -> Some x
+              | None -> go (i + 1)
+            in
+            match d with
+              Wedge directives -> g directives
+            | Thunk (_, _, Some d) -> g [| d |]
+            | _ -> go (i + 1)
+          )
+      else
+        None
+    in
+    go 0
+  in fun element namespace directives callback ->
   match eventToName TransitionEnd with
     Some name ->
     let directives, events =
