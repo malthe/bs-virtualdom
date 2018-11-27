@@ -112,7 +112,7 @@ You can mix and match directives; some affect the element itself such as `attr` 
 | `prop`         | Sets a property             | `prop "value" "42"`                          |
 | `style`        | Sets a style                | `style ~important:true "border" "none"`      |
 | `text`         | Adds a text node            | `text "Hello"`                               |
-| `thunk`        | Caches a directive          | `thunk (fun i -> text (string_of_int i)) 42` |
+| `thunk`        | Caches a directive          | `thunk f 42`                                 |
 | `wedge`        | Inserts multiple directives | `wedge children`                             |
 
 Additional documentation can be found in the [module signature](src/virtualdom.mli).
@@ -138,7 +138,7 @@ The example above assumes that `Clicked of Dom.element` is a message that's unde
 The `removeTransition` directive is bound to the internal event of an element being removed from the tree. The directive is similar to `wedge` except it's only activated when the element is removed:
 
 ```ocaml
-let node = h [|
+let node = h "div" [|
   text "Hello world";
   removeTransition [|
     style "opacity" "0";
@@ -154,11 +154,47 @@ It's possible to nest `removeTransition` directives to create multi-layered tran
 
 The key to good performance is to do as little work as possible in every iteration of the render loop. Work in the context of this library is both calling into view functions to create the virtual node structures and actually applying those structures on the DOM elements in the document.
 
-The strangely named `thunk` directive serves the purpose of avoiding calling into view functions by caching the result. It's inspired by Elm's [Html.Lazy](https://guide.elm-lang.org/optimization/lazy.html) module.:
+### Using predefined nodes
+
+This is the most simple way of optimizing your view functions. Simply move static nodes outside of the rendering loop to avoid dynamic allocation:
+
+```ocaml
+let button title message =
+  h "button" [|
+    text title;
+    onClick (fun _ -> message)
+  |]
+
+let signupButton = button "Signup" SignupClicked
+```
+
+When you're using this predefined signup button in your view code, the library knows that it can safely skip over it when patching.
+
+### Caching nodes with thunks
+
+The strangely named `thunk` directive serves the purpose of avoiding calling into view functions using a caching mechanism. It's inspired by Elm's [Html.Lazy](https://guide.elm-lang.org/optimization/lazy.html) module.:
 ```ocaml
 val thunk : ('a -> 'b Virtualdom.t) -> 'a -> 'b Virtualdom.t
 ```
-Using the "same input, same output" philosophy, the thunk is only evaluated when the input changes. This comparison uses strict equality which basically means it has to be the exact same object.
+Using the "same input, same output" philosophy, the thunk is only evaluated when the input changes. This comparison uses strict equality which basically means it has to be the exact same object, but importantly, the view function itself must be exactly the same as well.
+
+As when using static nodes (see previous section), you must define the thunk's view function outside of the main rendering loop. Here's an example:
+```ocaml
+let renderItem item =
+  h "div" [|
+    className ("item-" ^ item.name);
+    wedge (renderSubItems item.children)
+  |]
+
+let view state =
+  h "div" (
+    Array.map (thunk renderItem) state.items
+  )
+```
+
+You can use thunks to cache nodes at multiple levels in your application. In fact, the requirement that the function must be defined statically, can be helpful in organizing your view code and avoid excessive nesting.
+
+### Strict equality
 
 From Elm's documentation (adapted to OCaml):
 
@@ -168,8 +204,3 @@ From Elm's documentation (adapted to OCaml):
 > * Reference equality is used for records, lists, custom types, dictionaries, etc.
 >
 > Structural equality means that 4 is the same as 4 no matter how you produced those values. Reference equality means the actual pointer in memory has to be the same. Using reference equality is always cheap O(1), even when the data structure has thousands or millions of entries. So this is mostly about making sure that using lazy will never slow your code down a bunch by accident. All the checks are super cheap!
-
-You can use thunks to wrap components at multiple levels in your application. If a component truly depends only on the provided state argument – the `'a` type variable in the signature above – this mechanism is a powerful to structure applications while at the same time ensuring you're doing the least amount of work required.
-
-In particular, you'll want to be careful not to carry over additional state that's not contained in the type variable, turning your function into a closure.
-

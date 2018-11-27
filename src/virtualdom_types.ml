@@ -20,5 +20,6 @@ and 'a vnode = {
   namespace : string option;
   selector : string;
   directives : 'a t array;
+  detached : 'a t option;
   events : int;
 }

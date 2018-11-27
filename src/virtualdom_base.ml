@@ -436,8 +436,10 @@ and patch ?remove:(removeTransition=false) element defaultNamespace =
                matchNext (
                  function
                    Some (
-                     Thunk (state', _, Some d) as thunk
-                   ) when state == unsafe_identity state' ->
+                     Thunk (state', fn', Some d) as thunk
+                   ) when
+                     fn == unsafe_identity fn' &&
+                     state == unsafe_identity state' ->
                    Found (
                      thunk,
                      getNextSibling d
@@ -481,7 +483,8 @@ and patch ?remove:(removeTransition=false) element defaultNamespace =
                    )
                )
              | Attached _ as d -> Match d
-             | Detached (Some key, namespace, selector, newDirectives) ->
+             | Detached
+                 (Some key, namespace, selector, newDirectives) as detached ->
                let keys = match keys with
                    Some keys -> keys
                  | None -> scan ()
@@ -514,7 +517,7 @@ and patch ?remove:(removeTransition=false) element defaultNamespace =
                  | _ ->
                    let vnode = create element next
                        (Some key) (namespace =| defaultNamespace)
-                       selector newDirectives in
+                       selector newDirectives detached in
                    Events (
                      childEventToParent vnode.events,
                      Forward (
@@ -525,33 +528,43 @@ and patch ?remove:(removeTransition=false) element defaultNamespace =
                      )
                    )
                )
-             | Detached (key, namespace, selector, newDirectives) ->
+             | Detached (key, namespace, selector, newDirectives) as detached ->
                matchNext (
                  function
                    Some (
                      Attached ({
                          element = child;
                          directives;
-                       } as vnode)
+                         detached = Some detached';
+                       } as attached) as t
                    ) when
-                     sameKeyOrSelector
-                       key namespace selector vnode ->
-                   let vnode =
-                     patch child namespace directives newDirectives
-                     |> apply vnode child
-                   in
-                   Events (
-                     childEventToParent vnode.events,
-                     Found (
-                       Attached vnode,
-                       nextElementSibling child
+                     detached == detached' ||
+                     sameKeyOrSelector key namespace selector attached ->
+                   if detached == detached' then
+                     Events (
+                       childEventToParent attached.events,
+                       Found (
+                         t,
+                         nextElementSibling child
+                       )
                      )
-                   )
+                   else
+                     let vnode =
+                       patch child namespace directives newDirectives
+                       |> apply attached child
+                     in
+                     Events (
+                       childEventToParent vnode.events,
+                       Found (
+                         Attached vnode,
+                         nextElementSibling child
+                       )
+                     )
                  | _ ->
                    let vnode =
                      create element next key
                        (namespace =| defaultNamespace)
-                       selector newDirectives in
+                       selector newDirectives detached in
                    Events (
                      childEventToParent vnode.events,
                      New (Attached vnode)
@@ -595,7 +608,7 @@ and patch ?remove:(removeTransition=false) element defaultNamespace =
   in
   go None removeTransition None 0
 
-and create parent next key namespace selector directives =
+and create parent next key namespace selector directives detached =
   let namespace = match namespace with
       Some ns -> Some ns
     | None ->
@@ -610,6 +623,7 @@ and create parent next key namespace selector directives =
     namespace;
     selector;
     directives;
+    detached = Some detached;
     events;
   }
 
@@ -790,6 +804,7 @@ let start element selector =
       selector;
       element;
       directives = empty;
+      detached = None;
       namespace = None;
     } in
     let r = ref vnode in
@@ -853,8 +868,9 @@ module Export = struct
   let text string =
     Text (None, string)
 
-  let thunk fn key =
-    Thunk (key, fn, None)
+  let thunk fn =
+    fun key ->
+      Thunk (key, fn, None)
 
   let wedge directives =
     Wedge directives
