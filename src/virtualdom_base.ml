@@ -52,14 +52,6 @@ type event =
   | Wheel
 [@@bs.deriving jsConverter]
 
-type 'a update =
-    Found of ('a t * Dom.node option)
-  | Forward of ('a t * 'a t array * int * Dom.node option)
-  | Keys of ('a vnode Js.Nullable.t Js.Dict.t * 'a update)
-  | Events of (int * 'a update)
-  | Match of 'a t
-  | New of 'a t
-
 let eventToName = function
     Abort -> Some "abort"
   | BeforeInput -> Some "beforeinput"
@@ -194,18 +186,36 @@ let rec getNextSibling = function
     g @@ Array.length directives
   | _ -> None
 
-let sameKeyOrSelector key namespace selector vnode =
-  key = vnode.key &&
+let sameVNode namespace selector vnode =
   namespace = vnode.namespace &&
   selector = vnode.selector
 
 let hasRemoveEvent n event =
   n land (1 lsl eventToJs event) != 0
 
-let insert parent child next =
-  match next with
+let insert parent child reference =
+  match reference with
     Some reference -> insertBefore parent child reference
   | None -> appendElement parent child
+
+let rec insertNested parent directives reference =
+  Array.fold_left
+    (fun reference d ->
+       let rec go =
+         function
+         Attached { element } ->
+         insert parent element reference;
+         nextElementSibling element
+       | Text (Some node, _) ->
+         insert parent node reference;
+         nextTextSibling node
+       | Thunk (_, _, Some d) -> go d
+       | Wedge directives ->
+         insertNested parent directives reference
+       | _ -> reference
+       in go d
+    )
+    reference directives
 
 let childEventToParent n =
   if hasRemoveEvent n RemoveSelf then
@@ -214,7 +224,7 @@ let childEventToParent n =
   else
     n
 
-let apply vnode element (directives, events) = {
+let apply vnode element (directives, _, events) = {
   vnode with
   element;
   events;
@@ -271,26 +281,15 @@ let rec dispatch i event update =
       | None -> ()
 
 and patch ?remove:(removeTransition=false) element defaultNamespace =
-  let rec cleanup keys = function
+  let rec cleanup = function
       Attribute (Some ns, name, _) -> removeAttributeNS element ns name
     | Attribute (None, name, _) -> removeAttribute element name
     | ClassName name -> removeClassName element name
     | Property (name, _) -> removeProperty element name
     | Style (name, _, _) -> removeStyle element name
     | Text (Some node, _) -> removeElement element node
-    | Attached vnode
-      when (
-        (* There are two cases here. Either the vnode isn't keyed,
-           or we need to check if it was already seen, indicated
-           by `None`. *)
-        match keys, vnode.key with
-          Some keys, Some key -> (
-            match Js.Dict.unsafeGet keys key with
-              x when x = Js.Nullable.null -> false
-            | _ -> true
-          )
-        | _ -> true
-      ) ->
+    | Thunk (_, _, Some d) -> cleanup d
+    | Attached vnode ->
       removeVNode
         element
         vnode.element
@@ -301,301 +300,300 @@ and patch ?remove:(removeTransition=false) element defaultNamespace =
     | Wedge directives ->
       let length = Array.length directives in
       for i = 0 to length - 1 do
-        cleanup keys (Array.get directives i)
+        cleanup (Array.get directives i)
       done
     | _ -> ()
   in
 
-  let rec go
+  let rec go1
+      alwaysReorder
       insertionPoint
       removeTransition
-      keys
       events
       oldDirectives
       newDirectives =
     let updatedDirectives = Array.make (Array.length newDirectives) Skip in
-    let events =
+    let directives, i, insertionPoint, events =
       fold_lefti
-        (fun (directives, i, insertionPoint, keys, events) j current ->
-           let scan () =
-             let keys = Js.Dict.empty () in
-             let rec go directives i =
-               for j = i to Array.length directives - 1 do
-                 match Array.get directives j with
-                   Attached ({ key = Some key } as vnode) ->
-                   Js.Dict.set keys key (Js.Nullable.return vnode)
-                 | Wedge directives -> go directives 0
-                 | _ -> ()
-               done
-             in
-             go directives i;
-             keys
-           in
-           let update next =
-             function
-               Attribute (ns, name, value) as d -> (
-                 match next with
-                   Attribute (ns', name', value')
-                   when ns = ns' &&
-                        name = name' &&
-                        value = value' -> Match d
-                 | _ -> (
-                     match ns with
-                       Some ns -> setAttributeNS element ns name value
-                     | None -> setAttribute element name value
-                   );
-                   New d
-               )
-             | ClassName name as d -> (
-                 match next with
-                   ClassName name' when name = name' -> Match d
-                 | _ -> addClassName element name; New d
-               )
-             | EventListener (n, _) as d ->
-               Events (
-                 1 lsl n, (
-                   match next with
-                     EventListener (n', _)
-                     when n = n' -> Match d
-                   | _ -> New d
-                 )
-               )
-             | RemoveTransition (name, directives, active) as d ->
-               if removeTransition then (
-                 let updated, events =
-                   go insertionPoint active keys events empty directives in
-                 Events (
-                   events,
-                   Found (
-                     RemoveTransition (name, updated, true),
-                     getNextSibling (
-                       Wedge directives
-                     )
-                   )
-                 )
-               ) else (
-                 Events (
-                   1 lsl eventToJs RemoveSelf,
-                   Match d
-                 )
-               )
-             | Property (name, value) as d -> (
-                 match next with
-                   Property (name', value')
-                   when name = name' && value = value' -> Match d
-                 | _ -> setProperty element name value; New d
-               )
-             | Skip as d -> (
-                 match next with
-                   Skip -> Match d
-                 | _ -> New d
-               )
-             | Style (name, value, important) as d -> (
-                 match next with
-                   Style (name', value', important')
-                   when name = name' && value = value' &&
-                        important = important' ->
-                   Match d
-                 | _ ->
-                   setStyle element name value important;
-                   New d
-               )
-             | Text (_, string) -> (
-                 match next with
-                   Text (Some oldTextNode, string') ->
-                   if string <> string' then
-                     setTextContent oldTextNode string;
-                   Found (
-                     Text (Some oldTextNode, string),
-                     nextTextSibling oldTextNode
-                   )
-                 | _ ->
-                   let child = createTextNode string in
-                   insert element child insertionPoint;
-                   New (
-                     Text (Some child, string)
-                   )
-               )
-             | Thunk (state, fn, _) -> (
-                 match next with
-                   Thunk (state', fn', Some d) as thunk
-                   when
-                     fn == unsafe_identity fn' &&
-                     state == unsafe_identity state' ->
-                   Found (
-                     thunk,
-                     getNextSibling d
-                   )
-                 | t ->
-                   let d = fn state in
-                   let getDirectives = function
-                       Wedge d -> d
-                     | x -> [| x |]
-                   in
-                   let make xs =
-                     let result, events =
-                       go insertionPoint
-                         removeTransition keys events xs (getDirectives d)
-                     in
-                     events, (
-                       if Array.length result > 1
-                       then
-                         Wedge result
-                       else
-                         Array.get result 0
-                     ) in (
-                     match t with
-                       Thunk (_, _, Some d) ->
-                       let events, d = make (getDirectives d) in
-                       Events (
-                         events,
-                         Found (
-                           Thunk (state, fn, Some d),
-                           getNextSibling d
-                         )
-                       )
-                     | _ ->
-                       let events, d = make empty in
-                       Events (
-                         events,
-                         New (
-                           Thunk (state, fn, Some d)
-                         )
-                       )
-                   )
-               )
-             | Attached _ as d -> Match d
-             | Detached
-                 (Some key, namespace, selector, newDirectives) as detached ->
-               let keys = match keys with
-                   Some keys -> keys
-                 | None -> scan ()
-               in (
-                 match Js.Dict.get keys key >>! Js.Nullable.toOption with
-                   Some ({ element = child;
-                           directives = oldDirectives;
-                         } as vnode)
-                   when
-                     sameKeyOrSelector
-                       (Some key) namespace selector vnode ->
-                   let sibling = nextElementSibling child in
-                   insert element child insertionPoint;
-                   Js.Dict.set keys key Js.Nullable.null;
-                   let vnode =
-                     patch child namespace oldDirectives newDirectives
-                     |> apply vnode child in
-                   Events (
-                     childEventToParent vnode.events,
-                     Keys (
-                       keys,
-                       Forward (
-                         Attached vnode,
-                         empty,
-                         0,
-                         sibling
-                       )
-                     )
-                   )
-                 | _ ->
-                   let vnode = create element insertionPoint
-                       (Some key) (namespace =| defaultNamespace)
-                       selector newDirectives detached in
-                   Events (
-                     childEventToParent vnode.events,
-                     Forward (
-                       Attached vnode,
-                       empty,
-                       0,
-                       None
-                     )
-                   )
-               )
-             | Detached (key, namespace, selector, newDirectives) as detached -> (
-                 match next with
-                   Attached ({
-                       element = child;
-                       directives;
-                       detached = Some detached';
-                     } as attached) as t
-                   when
-                     detached == detached' ||
-                     sameKeyOrSelector key namespace selector attached ->
-                   if detached == detached' then
-                     Events (
-                       childEventToParent attached.events,
-                       Found (
-                         t,
-                         nextElementSibling child
-                       )
-                     )
-                   else
-                     let vnode =
-                       patch child namespace directives newDirectives
-                       |> apply attached child
-                     in
-                     Events (
-                       childEventToParent vnode.events,
-                       Found (
-                         Attached vnode,
-                         nextElementSibling child
-                       )
-                     )
-                 | _ ->
-                   let vnode =
-                     create element insertionPoint key
-                       (namespace =| defaultNamespace)
-                       selector newDirectives detached in
-                   Events (
-                     childEventToParent vnode.events,
-                     New (Attached vnode)
-                   )
-               )
-             | Wedge xs -> (
-                 match next with
-                   Wedge xs' ->
-                   let keys = Js.Dict.empty () in
-                   let updated, events = go insertionPoint
-                       removeTransition (Some keys) events xs' xs in
-                   let d = Wedge updated in
-                   Events (events, Found (d, getNextSibling d))
-                 | _ ->
-                   let updated, events = go insertionPoint
-                       removeTransition keys events empty xs in
-                   Events (events, New (Wedge updated))
-               )
-           in
+        (fun (directives, i, insertionPoint, events) j current ->
            let set = Array.set updatedDirectives j in
-           let nextOldDirective =
-             if i < Array.length directives then
-               Array.get directives i
-             else
-               Skip
+           let existing =
+             match directives with
+               Some directives -> Array.get directives i
+             | None -> Skip
            in
-           let rec go events keys = function
-               Events (events', u) -> go (events lor events') keys u
-             | Forward (d, xs, i, next) -> set d; (xs, i, next, keys, events)
-             | Found (d, node) -> set d; (directives, i + 1, node, keys, events)
-             | Keys (keys, u) -> go events (Some keys) u
-             | Match d -> set d; (directives, i + 1, insertionPoint, keys, events)
-             | New d ->
-               cleanup keys nextOldDirective;
-               set d; (directives, i + 1, insertionPoint, keys, events)
+           let go events = function
+               (d, newEvents, insertionPoint, isNew) ->
+               let events = events lor newEvents in
+               if isNew then
+                 cleanup existing;
+               set d;
+               (directives, i + 1, insertionPoint, events)
            in
-           go events keys @@ update nextOldDirective current
-        ) (oldDirectives, 0, insertionPoint, keys, events) newDirectives
-      |>
-      fun (directives, i, _, keys, events) -> (
-        for j = i to Array.length directives - 1 do
-          cleanup keys @@ Array.get directives j
-        done;
-        events
-      )
+           go events @@
+           update alwaysReorder removeTransition existing
+             insertionPoint events current
+        ) (oldDirectives, 0, insertionPoint, events) newDirectives
     in
-    updatedDirectives, events
-  in
-  go None removeTransition None 0
+    directives >>? (
+      fun directives ->
+        for j = i to Array.length directives - 1 do
+          Array.get directives j |. cleanup
+        done
+    );
+    updatedDirectives, insertionPoint, events
 
-and create parent next key namespace selector directives detached =
+  and go2
+      insertionPoint
+      removeTransition
+      events
+      oldIndex
+      newIndex =
+    let keys = Js.Dict.fromArray oldIndex in
+    let reverse =
+      Array.mapi (fun i key -> (key, i)) (Js.Dict.keys keys)
+      |> Js.Dict.fromArray
+    in
+    let oldIndex = Array.copy oldIndex in
+    let updatedIndex = Array.copy newIndex in
+
+    let insertionPoint, events =
+      fold_lefti
+        (fun (insertionPoint, events) j (key, current) ->
+           let set value = Array.set updatedIndex j (key, value) in
+           let existing =
+             match Js.Dict.get keys key with
+               Some value ->
+               Js.Dict.get reverse key >>?
+               (fun i -> Array.set oldIndex i (key, Skip));
+               value
+             | None -> Skip
+           in
+           let go events = function
+               (d, newEvents, insertionPoint, isNew) ->
+               let events = events lor newEvents in
+               if isNew then
+                 cleanup existing;
+               set d;
+               (insertionPoint, events)
+           in
+           go events @@
+           update true removeTransition existing insertionPoint events current
+        ) (insertionPoint, events) newIndex
+    in
+    Array.iter cleanup (Array.map snd oldIndex);
+    updatedIndex, insertionPoint, events
+
+  and update alwaysReorder removeTransition next insertionPoint events =
+    function
+      Attribute (ns, name, value) as d -> (
+        match next with
+          Attribute (ns', name', value')
+          when ns = ns' &&
+               name = name' &&
+               value = value' -> (d, 0, insertionPoint, false)
+        | _ -> (
+            match ns with
+              Some ns -> setAttributeNS element ns name value
+            | None -> setAttribute element name value
+          );
+          (d, 0, insertionPoint, true)
+      )
+    | ClassName name as d -> (
+        match next with
+          ClassName name' when name = name' ->
+          (d, 0, insertionPoint, false)
+        | _ -> addClassName element name;
+          (d, 0, insertionPoint, true)
+      )
+    | EventListener (n, _) as d ->
+      (d, 1 lsl n, insertionPoint, (
+          match next with
+            EventListener (n', _)
+            when n = n' -> false
+          | _ -> true
+        )
+      )
+    | Index d -> (
+        match next with
+          Index d' ->
+          let updated, insertionPoint, events =
+            go2 insertionPoint removeTransition events d' d
+          in
+          (Index updated, events, insertionPoint, false)
+        | _ ->
+          let directives = Array.map snd d in
+          let updated, insertionPoint, events =
+            go1 false insertionPoint
+              removeTransition events None directives in
+          let d =
+            Array.mapi
+              (fun i directive -> (Array.get d i |. fst, directive))
+              updated
+          in
+          (Index d, events, insertionPoint, true)
+      )
+    | Property (name, value) as d -> (
+        match next with
+          Property (name', value')
+          when name = name' && value = value' ->
+          (d, 0, insertionPoint, false)
+        | _ ->
+          setProperty element name value;
+          (d, 0, insertionPoint, true)
+      )
+    | RemoveTransition (name, directives, _) as d -> (
+        match next with
+          RemoveTransition (_, directives', active) ->
+          if removeTransition then (
+            let updated, insertionPoint, events =
+              go1 alwaysReorder
+                insertionPoint true events
+                (if active then
+                   (Some directives')
+                 else
+                   None)
+                directives in (
+              RemoveTransition (name, updated, true),
+              events,
+              insertionPoint,
+              false
+            )
+          ) else (d, 1 lsl eventToJs RemoveSelf, insertionPoint, false)
+        | _ ->
+          if removeTransition then (
+            let updated, insertionPoint, events =
+              go1 alwaysReorder
+                insertionPoint false events
+                None directives in (
+              RemoveTransition (name, updated, true),
+              events,
+              insertionPoint,
+              true
+            )
+          ) else (
+            d, 1 lsl eventToJs RemoveSelf, insertionPoint, true
+          )
+      )
+    | Skip as d -> (
+        d, 0, insertionPoint, (
+          match next with
+            Skip -> false
+          | _ -> true
+        )
+      )
+    | Style (name, value, important) as d -> (
+        match next with
+          Style (name', value', important')
+          when name = name' && value = value' &&
+               important = important' ->
+          (d, 0, insertionPoint, false)
+        | _ ->
+          setStyle element name value important;
+          (d, 0, insertionPoint, true)
+      )
+    | Text (_, string) -> (
+        match next with
+          Text (Some oldTextNode, string') ->
+          if string <> string' then
+            setTextContent oldTextNode string;
+          if alwaysReorder then
+            insert element oldTextNode insertionPoint;
+          (Text (Some oldTextNode, string), 0, insertionPoint, false)
+        | _ ->
+          let child = createTextNode string in
+          insert element child insertionPoint;
+          (Text (Some child, string), 0, insertionPoint, true)
+      )
+    | Thunk (state, fn, _) -> (
+        match next with
+          Thunk (state', fn', Some d) as thunk
+          when
+            fn == unsafe_identity fn' &&
+            state == unsafe_identity state' ->
+          let insertionPoint =
+            if alwaysReorder then
+              insertNested element [| d |] insertionPoint
+            else
+              getNextSibling d
+          in
+          (thunk, 0, insertionPoint, false)
+        | t ->
+          let d = fn state in
+          let getDirectives = function
+              Wedge d -> d
+            | x -> [| x |]
+          in
+          let make xs =
+            let result, insertionPoint, events =
+              go1
+                alwaysReorder
+                insertionPoint
+                removeTransition events xs (getDirectives d)
+            in
+            insertionPoint, events, (
+              if Array.length result > 1
+              then
+                Wedge result
+              else
+                Array.get result 0
+            ) in (
+            match t with
+              Thunk (_, _, Some d) ->
+              let insertionPoint, events, d = make (Some (getDirectives d)) in
+              (Thunk (state, fn, Some d), events, insertionPoint, false)
+            | _ ->
+              let insertionPoint, events, d = make None in
+              (Thunk (state, fn, Some d), events, insertionPoint, true)
+          )
+      )
+    | Attached { detached = Some d } ->
+      update alwaysReorder removeTransition next insertionPoint events d
+    | Attached _ -> (Skip, 0, insertionPoint, true)
+    | Detached (namespace, selector, newDirectives) as detached -> (
+        match next with
+          Attached ({
+              element = child;
+              directives;
+              detached = Some detached';
+            } as attached) as t
+          when
+            detached == detached' ||
+            sameVNode namespace selector attached ->
+          if alwaysReorder then
+            insert element child insertionPoint;
+          let sibling = nextElementSibling child in
+          if detached == detached' then
+            (t, childEventToParent attached.events, sibling, false)
+          else
+            let vnode =
+              patch child namespace (Some directives) newDirectives
+              |> apply attached child
+            in
+            (Attached vnode, childEventToParent vnode.events, sibling, false)
+        | _ ->
+          let vnode =
+            create element insertionPoint
+              (namespace =| defaultNamespace)
+              selector newDirectives detached in
+          let sibling = nextElementSibling vnode.element in
+          (Attached vnode, childEventToParent vnode.events, sibling, true)
+      )
+    | Wedge xs -> (
+        match next with
+          Wedge xs' ->
+          let updated, insertionPoint, events = go1 alwaysReorder insertionPoint
+              removeTransition events (Some xs') xs in
+          (Wedge updated, events, insertionPoint, false)
+        | _ ->
+          let updated, insertionPoint, events = go1 alwaysReorder insertionPoint
+              removeTransition events None xs in
+          (Wedge updated, events, insertionPoint, true)
+      )
+  in
+  go1 false None removeTransition 0
+
+and create parent next namespace selector directives detached =
   let namespace = match namespace with
       Some ns -> Some ns
     | None ->
@@ -603,10 +601,9 @@ and create parent next key namespace selector directives detached =
   in
   let element = createElement namespace selector in
   insert parent element next;
-  let (directives, events) =
-    patch element namespace [||] directives in {
+  let (directives, _, events) =
+    patch element namespace None directives in {
     element;
-    key;
     namespace;
     selector;
     directives;
@@ -677,12 +674,12 @@ and removeVNodeOwnTransition =
   in fun element namespace directives callback ->
     match eventToName TransitionEnd with
       Some name ->
-      let directives, events =
+      let directives, _, events =
         patch
           ~remove:true
           element
           namespace
-          directives
+          (Some directives)
           directives
       in
       let property = search (
@@ -737,7 +734,11 @@ let start element selector =
   let patch vnode update directives =
     let events = vnode.events in
     let vnode =
-      patch element vnode.namespace vnode.directives directives
+      let oldDirectives = match vnode.directives with
+          [||] -> None
+        | array -> Some array
+      in
+      patch element vnode.namespace oldDirectives directives
       |> apply vnode element
     in
     let () =
@@ -787,7 +788,6 @@ let start element selector =
   in
   let vnode = {
     events = 0;
-    key = None;
     selector;
     element;
     directives = empty;
@@ -816,8 +816,11 @@ module Export = struct
 
   let empty = [||]
 
-  let h ?key ?namespace selector directives =
-    Detached (key, namespace, selector, directives)
+  let h ?namespace selector directives =
+    Detached (namespace, selector, directives)
+
+  let index array =
+    Index array
 
   let maybe opt f = match opt with
       Some x -> f x
@@ -856,8 +859,8 @@ module Export = struct
     Text (None, string)
 
   let thunk fn =
-    fun key ->
-      Thunk (key, fn, None)
+    fun state ->
+      Thunk (state, fn, None)
 
   let wedge directives =
     Wedge directives

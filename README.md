@@ -23,9 +23,10 @@ You'll have to try hard to shoot yourself in the foot!
 
 The library provides the following building blocks which are also _directives_:
 
-- `h` function to create virtual nodes.
+- `h` function to create virtual nodes (or _vnodes_ for short).
 - `thunk` function to cache nodes.
-- `wedge` function to insert multiple directives.
+- `wedge` function to insert multiple directives
+- `index` function to insert multiple _keyed_ directives.
 - a number of directives that adds attributes, classes, events, properties, and styles to a virtual node.
 
 In addition, `mount` is what you use to attach the main view function to an existing DOM element.
@@ -80,9 +81,9 @@ The `update` function will often have to deal with asynchronous logic. This is i
 
 The `h` function takes a tag name such as `"div#main.app-like"` and an array of directives:
 ```ocaml
-val h : ?key:string -> ?namespace:string -> string -> Virtualdom.t array -> Virtualdom.t
+val h : ?namespace:string -> string -> Virtualdom.t array -> Virtualdom.t
 ```
-The `key` argument is optional. If provided, it should be unique among the immediate children. We'll talk more about this in a bit. The return value is a virtual node, but it's also a directive in its own right. This is how we add child nodes:
+The return value is a virtual node, but it's also a directive in its own right. This is how we add child nodes:
 ```ocaml
 let node = h "div" [|
   h "span" [|
@@ -95,9 +96,13 @@ An overview of the directives is presented in the next section, but it's importa
 
 This library uses a reconciliation algorithm similar to [React](https://reactjs.org/docs/reconciliation.html), also known as "patch and diff". Basically, the library matches the old tree with the new tree and makes the required changes. Ideally, the minimum amount of changes required, but the algorithm is rather simple. To match an old node with a new one, it lines up the arrays of directives and makes at most one comparison. What this effectively means is that we need a special mechanism to deal with reorderings.
 
-This is where the optional `key` argument comes in.
-
 In a situation where we're reordering children and/or adding and removing them, we need to equip the patch and diff algorithm with a unique key for each child. The algorithm will still apply the reconciliation algorithm to keyed child nodes, but it will be able to do so without removing and creating the elements from scratch (why slows down our app and causes unnecessary reflowing.)
+
+This mechanism is activated through the use of the `index` function.
+```ocaml
+val index : (Js.Dict.key * 'a Virtualdom.t) array -> 'a Virtualdom.t
+```
+It's like a wedge, but lets you specify a string key for each directive (typically a vnode).
 
 ## Directives
 

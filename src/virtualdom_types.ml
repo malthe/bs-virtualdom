@@ -2,8 +2,9 @@ type 'a t =
     Attached of 'a vnode
   | Attribute of string option * string * string
   | ClassName of string
-  | Detached of string option * string option * string * 'a t array
+  | Detached of string option * string * 'a t array
   | EventListener : int * ('a, 'b) listener -> 'a t
+  | Index of (Js.Dict.key * 'a t) array
   | Property of string * string
   | RemoveTransition of string option * 'a t array * bool
   | Skip
@@ -16,7 +17,6 @@ and ('a, 'b) listener = 'b Dom.event_like -> 'a
 
 and 'a vnode = {
   element : Dom.element;
-  key : string option;
   namespace : string option;
   selector : string;
   directives : 'a t array;

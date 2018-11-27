@@ -13,7 +13,10 @@ val cond : bool -> 'a t -> 'a t
 val empty : 'a t array
 
 (** This function returns a new virtual DOM tree. *)
-val h : ?key:string -> ?namespace:string -> string -> 'a t array -> 'a t
+val h : ?namespace:string -> string -> 'a t array -> 'a t
+
+(** This function inserts an indexed array of directives. *)
+val index : (Js.Dict.key * 'a t) array -> 'a t
 
 (** Include directive if condition is true. *)
 val maybe : 'a option -> ('a -> 'a t) -> 'a t
@@ -182,4 +185,3 @@ val thunk : ('a -> 'b t) -> 'a -> 'b t
     example to add an array of children to a node in addition to other
     directives. *)
 val wedge : 'a t array -> 'a t
-
