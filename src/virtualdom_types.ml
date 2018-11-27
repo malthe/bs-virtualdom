@@ -7,7 +7,7 @@ type 'a t =
   | Skip
   | Style of string * string * bool
   | Text of Dom.text option * string
-  | Thunk : ('c * ('c -> 'a t) * 'a t option) -> 'a t
+  | Thunk : ('b * ('b -> 'a t) * 'a t option) -> 'a t
   | Detached of string option * string option * string * 'a t array
   | Attached of 'a vnode
   | Wedge of 'a t array
