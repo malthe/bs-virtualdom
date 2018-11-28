@@ -190,6 +190,17 @@ let sameVNode namespace selector vnode =
   namespace = vnode.namespace &&
   selector = vnode.selector
 
+let arrayOf = function
+    Wedge d -> d
+  | x -> [| x |]
+
+let ofArray array =
+  if Array.length array != 1
+  then
+    Wedge array
+  else
+    Array.get array 0
+
 let hasRemoveEvent n event =
   n land (1 lsl eventToJs event) != 0
 
@@ -280,7 +291,8 @@ let rec dispatch i event update =
         dispatch i event update directives xs
       | None -> ()
 
-and patch ?remove:(removeTransition=false) element defaultNamespace =
+let rec patch
+    ?remove:(removeTransition=false) element defaultNamespace =
   let rec cleanup = function
       Attribute (Some ns, name, _) -> removeAttributeNS element ns name
     | Attribute (None, name, _) -> removeAttribute element name
@@ -303,9 +315,8 @@ and patch ?remove:(removeTransition=false) element defaultNamespace =
         cleanup (Array.get directives i)
       done
     | _ -> ()
-  in
 
-  let rec go1
+  and go1
       alwaysReorder
       insertionPoint
       removeTransition
@@ -520,27 +531,18 @@ and patch ?remove:(removeTransition=false) element defaultNamespace =
           (thunk, 0, insertionPoint, false)
         | t ->
           let d = fn state in
-          let getDirectives = function
-              Wedge d -> d
-            | x -> [| x |]
-          in
           let make xs =
             let result, insertionPoint, events =
               go1
                 alwaysReorder
                 insertionPoint
-                removeTransition events xs (getDirectives d)
+                removeTransition events xs (arrayOf d)
             in
-            insertionPoint, events, (
-              if Array.length result > 1
-              then
-                Wedge result
-              else
-                Array.get result 0
-            ) in (
+            insertionPoint, events, ofArray result
+          in (
             match t with
               Thunk (_, _, Some d) ->
-              let insertionPoint, events, d = make (Some (getDirectives d)) in
+              let insertionPoint, events, d = make (Some (arrayOf d)) in
               (Thunk (state, fn, Some d), events, insertionPoint, false)
             | _ ->
               let insertionPoint, events, d = make None in
@@ -566,9 +568,10 @@ and patch ?remove:(removeTransition=false) element defaultNamespace =
           if detached == detached' then
             (t, childEventToParent attached.events, sibling, false)
           else
-            let vnode =
+            let vnode = {(
               patch child namespace (Some directives) newDirectives
               |> apply attached child
+            ) with detached = Some detached}
             in
             (Attached vnode, childEventToParent vnode.events, sibling, false)
         | _ ->
@@ -590,144 +593,145 @@ and patch ?remove:(removeTransition=false) element defaultNamespace =
               removeTransition events None xs in
           (Wedge updated, events, insertionPoint, true)
       )
+
+  and create parent next namespace selector directives detached =
+    let namespace = match namespace with
+        Some ns -> Some ns
+      | None ->
+        if isSVG selector then Some svgNS else None
+    in
+    let element = createElement namespace selector in
+    insert parent element next;
+    let (directives, _, events) =
+      patch element namespace None directives in {
+      element;
+      namespace;
+      selector;
+      directives;
+      detached = Some detached;
+      events;
+    }
+
+  and removeVNodeNested parent directives callback =
+    let count = ref 0 in
+    let rm () =
+      let i = !count - 1 in
+      if i = 0 then (
+        callback ();
+      ) else
+        count := i;
+    in
+    let rec go parent directives =
+      Array.fold_left
+        (fun count d ->
+           match d with
+             Attached vnode ->
+             count + (
+               if hasRemoveEvent vnode.events RemoveSelf then
+                 let () =
+                   removeVNode
+                     parent
+                     vnode.element
+                     vnode.namespace
+                     vnode.directives
+                     vnode.events
+                     rm in
+                 1
+               else (
+                 if hasRemoveEvent vnode.events RemoveChildren then
+                   go vnode.element vnode.directives
+                 else
+                   0
+               )
+             )
+           | _ -> count
+        ) 0 directives
+    in
+    count := go parent directives
+
+  and removeVNodeOwnTransition =
+    let rec search f directives =
+      let length = Array.length directives in
+      let rec go i =
+        if i < length then
+          let d = Array.get directives i in
+          match f d with
+            Some x -> Some x
+          | None -> (
+              let g directives =
+                match search f directives with
+                  Some x -> Some x
+                | None -> go (i + 1)
+              in
+              match d with
+                Wedge directives -> g directives
+              | Thunk (_, _, Some d) -> g [| d |]
+              | _ -> go (i + 1)
+            )
+        else
+          None
+      in
+      go 0
+    in fun element namespace directives callback ->
+      match eventToName TransitionEnd with
+        Some name ->
+        let directives, _, events =
+          patch
+            ~remove:true
+            element
+            namespace
+            (Some directives)
+            directives
+        in
+        let property = search (
+            function
+              RemoveTransition (Some name, _, true) -> Some name
+            | _ -> None
+          ) directives in
+        let target = Webapi.Dom.Element.asEventTarget element in
+        let options = [%bs.obj {
+          capture = true;
+          passive = true;
+          once = false;
+        }] in
+        let r = ref None in
+        let handler event =
+          if (
+            match property with
+              Some name ->
+              Webapi.Dom.TransitionEvent.propertyName
+                (unsafe_identity event) = name
+            | None -> true
+          ) then (
+            !r >>? fun f -> removeEventListener target name f options;
+            if hasRemoveEvent events RemoveSelf then
+              removeVNodeOwnTransition element namespace directives callback
+            else
+              callback ()
+          )
+        in
+        addEventListener target name handler options;
+        r := Some handler
+      | None -> callback ()
+
+  and removeVNode parent child namespace directives events callback =
+    let remove () =
+      removeElement parent child;
+      callback ()
+    in
+    let next () =
+      if hasRemoveEvent events RemoveSelf then
+        removeVNodeOwnTransition child namespace directives remove
+      else
+        remove ()
+    in
+    if hasRemoveEvent events RemoveChildren then
+      removeVNodeNested child directives next
+    else
+      next ()
+
   in
   go1 false None removeTransition 0
-
-and create parent next namespace selector directives detached =
-  let namespace = match namespace with
-      Some ns -> Some ns
-    | None ->
-      if isSVG selector then Some svgNS else None
-  in
-  let element = createElement namespace selector in
-  insert parent element next;
-  let (directives, _, events) =
-    patch element namespace None directives in {
-    element;
-    namespace;
-    selector;
-    directives;
-    detached = Some detached;
-    events;
-  }
-
-and removeVNodeNested parent directives callback =
-  let count = ref 0 in
-  let rm () =
-    let i = !count - 1 in
-    if i = 0 then (
-      callback ();
-    ) else
-      count := i;
-  in
-  let rec go parent directives =
-    Array.fold_left
-      (fun count d ->
-         match d with
-           Attached vnode ->
-           count + (
-             if hasRemoveEvent vnode.events RemoveSelf then
-               let () =
-                 removeVNode
-                   parent
-                   vnode.element
-                   vnode.namespace
-                   vnode.directives
-                   vnode.events
-                   rm in
-               1
-             else (
-               if hasRemoveEvent vnode.events RemoveChildren then
-                 go vnode.element vnode.directives
-               else
-                 0
-             )
-           )
-         | _ -> count
-      ) 0 directives
-  in
-  count := go parent directives
-
-and removeVNodeOwnTransition =
-  let rec search f directives =
-    let length = Array.length directives in
-    let rec go i =
-      if i < length then
-        let d = Array.get directives i in
-        match f d with
-          Some x -> Some x
-        | None -> (
-            let g directives =
-              match search f directives with
-                Some x -> Some x
-              | None -> go (i + 1)
-            in
-            match d with
-              Wedge directives -> g directives
-            | Thunk (_, _, Some d) -> g [| d |]
-            | _ -> go (i + 1)
-          )
-      else
-        None
-    in
-    go 0
-  in fun element namespace directives callback ->
-    match eventToName TransitionEnd with
-      Some name ->
-      let directives, _, events =
-        patch
-          ~remove:true
-          element
-          namespace
-          (Some directives)
-          directives
-      in
-      let property = search (
-          function
-            RemoveTransition (Some name, _, true) -> Some name
-          | _ -> None
-        ) directives in
-      let target = Webapi.Dom.Element.asEventTarget element in
-      let options = [%bs.obj {
-        capture = true;
-        passive = true;
-        once = false;
-      }] in
-      let r = ref None in
-      let handler event =
-        if (
-          match property with
-            Some name ->
-            Webapi.Dom.TransitionEvent.propertyName
-              (unsafe_identity event) = name
-          | None -> true
-        ) then (
-          !r >>? fun f -> removeEventListener target name f options;
-          if hasRemoveEvent events RemoveSelf then
-            removeVNodeOwnTransition element namespace directives callback
-          else
-            callback ()
-        )
-      in
-      addEventListener target name handler options;
-      r := Some handler
-    | None -> callback ()
-
-and removeVNode parent child namespace directives events callback =
-  let remove () =
-    removeElement parent child;
-    callback ()
-  in
-  let next () =
-    if hasRemoveEvent events RemoveSelf then
-      removeVNodeOwnTransition child namespace directives remove
-    else
-      remove ()
-  in
-  if hasRemoveEvent events RemoveChildren then
-    removeVNodeNested child directives next
-  else
-    next ()
 
 let start element selector =
   let listeners = Array.make (Array.length browserEvents) None in
