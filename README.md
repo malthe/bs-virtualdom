@@ -2,7 +2,7 @@
 
 A virtual DOM library written in OCaml/BuckleScript with a focus on ease-of-use, immutability and performance.
 
-It's got a small footprint. Just over 5KB compressed.
+It's got a small footprint. Just over 7KB compressed.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-brightgreen.svg)](https://opensource.org/licenses/MIT)
 
@@ -17,16 +17,17 @@ It's got a small footprint. Just over 5KB compressed.
 
 ## Introduction
 
-The library was designed from the ground up to support a functional, reactive application model. The user provides input and you translate that to messages which are then processed in a central update handler to feed a new state to the rendering loop.
+The library was designed from the ground up to support a functional programming model based on immutability. The user provides input and you translate that to messages which are then processed in a central update handler to feed a new state to the rendering loop.
 
 You'll have to try hard to shoot yourself in the foot!
 
 The library provides the following building blocks which are also _directives_:
 
 - `h` function to create virtual nodes (or _vnodes_ for short).
-- `thunk` function to cache nodes.
-- `wedge` function to insert multiple directives
-- `index` function to insert multiple _keyed_ directives.
+- `component` function to create independent, reusable components.
+- `thunk` function to cache directives.
+- `wedge` function to insert multiple directives.
+- `keyed` function to insert multiple _keyed_ directives.
 - a number of directives that adds attributes, classes, events, properties, and styles to a virtual node.
 
 In addition, `mount` is what you use to attach the main view function to an existing DOM element.
@@ -51,7 +52,7 @@ let update state notify = function
 let button title message =
   h "button" [|
     text title;
-    onClick (fun _ -> message)
+    onClick (fun _ -> Some message)
   |]
 
 let view state = [|
@@ -79,46 +80,50 @@ The `update` function will often have to deal with asynchronous logic. This is i
 
 ## Creating elements
 
-The `h` function takes a tag name such as `"div#main.app-like"` and an array of directives:
+The `h` function creates a vnode from a selector such as `"div#main.app-like"` and an array of _child directives_.
 ```ocaml
-val h : ?namespace:string -> string -> Virtualdom.t array -> Virtualdom.t
+val h : ?namespace:string -> string -> ('a, 'b) directive array -> ('a, 'b) directive
 ```
-The return value is a virtual node, but it's also a directive in its own right. This is how we add child nodes:
+The type variable `'a` is the message type (see the example in the introduction). The `'b` type variable is used when writing components. The return value is a virtual node, but it's also a directive in its own right. This is how we add child nodes:
 ```ocaml
-let node = h "div" [|
-  h "span" [|
-    text "Hello, ";
-    h "em" [| text "Zaphod Beeblebrox" |]
+let greeting =
+  h "div" [|
+    h "span" [|
+      text "Hello, ";
+      h "em" [| text "Zaphod Beeblebrox" |]
+    |]
   |]
-|]
 ```
-An overview of the directives is presented in the next section, but it's important to understand how virtual nodes turn into real nodes and how they're updated.
+An overview of the directives is presented in the next section, but it's important to understand how virtual nodes become real DOM elements and how they're kept in sync.
 
-This library uses a reconciliation algorithm similar to [React](https://reactjs.org/docs/reconciliation.html), also known as "patch and diff". Basically, the library matches the old tree with the new tree and makes the required changes. Ideally, the minimum amount of changes required, but the algorithm is rather simple. To match an old node with a new one, it lines up the arrays of directives and makes at most one comparison. What this effectively means is that we need a special mechanism to deal with reorderings.
+This library uses a reconciliation algorithm similar to [React](https://reactjs.org/docs/reconciliation.html), also known as "patch and diff". Basically, the library matches the old, _attached_ tree with the new, _detached_ tree and makes the required changes. Ideally, the minimum amount of changes required, but the algorithm is rather simple. To match an old node with a new one, it lines up the arrays of directives and makes at most one comparison. What this effectively means is that we need a special mechanism to deal with reorderings.
 
 In a situation where we're reordering children and/or adding and removing them, we need to equip the patch and diff algorithm with a unique key for each child. The algorithm will still apply the reconciliation algorithm to keyed child nodes, but it will be able to do so without removing and creating the elements from scratch (why slows down our app and causes unnecessary reflowing.)
 
-This mechanism is activated through the use of the `index` function.
+This mechanism is activated through the use of the `keyed` function.
 ```ocaml
-val index : (Js.Dict.key * 'a Virtualdom.t) array -> 'a Virtualdom.t
+val keyed : (Js.Dict.key * ('a, 'b) directive) array -> ('a, 'b) directive
 ```
-It's like a wedge, but lets you specify a string key for each directive (typically a vnode).
+It's like a wedge, but lets you specify a string for each directive (typically a vnode). This string is then used as the key in a lookup table in order to (possibly) locate the old directive and match it with the new one.
 
 ## Directives
 
 You can mix and match directives; some affect the element itself such as `attr` and `className` while `h` and `text` add child nodes:
 
-| Directive      | Description                 | Example                                      |
-| :------------- | :-------------------------- | :------------------------------------------- |
-| `attr`         | Sets an attribute           | `attr "href" "#"`                            |
-| `className`    | Sets a class name           | `className ("field-" ^ name)`                |
-| `cond`         | Conditionally use directive | `cond hidden (className "hidden")`           |
-| `h`            | Adds child                  | (See example above.)                         |
-| `prop`         | Sets a property             | `prop "value" "42"`                          |
-| `style`        | Sets a style                | `style ~important:true "border" "none"`      |
-| `text`         | Adds a text node            | `text "Hello"`                               |
-| `thunk`        | Caches a directive          | `thunk f 42`                                 |
-| `wedge`        | Inserts multiple directives | `wedge children`                             |
+| Directive          | Description                       | Example                                      |
+| :-------------     | :--------------------------       | :------------------------------------------- |
+| `attr`             | Sets an attribute                 | `attr "href" "#"`                            |
+| `className`        | Sets a class name                 | `className ("field-" ^ name)`                |
+| `component`        | Inserts a component               | `component view handler state`               |
+| `cond`             | Conditionally use directive       | `cond hidden (className "hidden")`           |
+| `h`                | Adds child                        | (See example above.)                         |
+| `keyed`            | Inserts multiple, keyed directive | `keyed children`                             |
+| `prop`             | Sets a property                   | `prop "value" "42"`                          |
+| `removeTransition` | Adds a remove transition stage    | `removeTransition directives`                |
+| `style`            | Sets a style                      | `style ~important:true "border" "none"`      |
+| `text`             | Adds a text node                  | `text "Hello"`                               |
+| `thunk`            | Caches a directive                | `thunk f 42`                                 |
+| `wedge`            | Inserts multiple directives       | `wedge children`                             |
 
 Additional documentation can be found in the [module signature](src/virtualdom.mli).
 
@@ -126,19 +131,29 @@ Additional documentation can be found in the [module signature](src/virtualdom.m
 
 The library comes with functions to bind to the most commonly used browser events.
 ```ocaml
-val onClick : (Dom.mouseEvent -> 'a) -> 'a t
+val onClick : (Dom.mouseEvent -> 'a option) -> ('a, 'b) t
 ```
 They're named exactly like their browser counterpart except for the camel-casing. In order to actually pull out information from the events, you can use [bs-webapi](https://www.npmjs.com/package/bs-webapi) which is already pulled in as a dependency of this library.
+
+The return value of the event handler is `'a option` since not all browser events need to become user interface events. For example, if you're listening to the `keypress` event, then you're probably only interested in a subset of key codes.
 ```ocaml
 onClick (
   fun event ->
     let open Webapi.Dom in
-    Clicked (MouseEvent.target event |. EventTarget.unsafeAsElement)
+    Some (
+      Clicked (
+        MouseEvent.target event |. EventTarget.unsafeAsElement)
+      )
+    )
 )
 ```
 The example above assumes that `Clicked of Dom.element` is a message that's understood by the update function.
 
+Note that the event system uses the bubbling nature of browser events and attaches event listeners only to the mounted root element (lazily, when required). It uses an internal dispatching system to invoke the matching event handlers defined in the virtual tree.
+
 ## Transitions
+
+The library comes with support for staged remove transitions. Normally, the patch and diff algorithm simply removes elements that are no longer in the tree, but to improve the user experience, we often want to stage a transition first (or possibly multiple.)
 
 The `removeTransition` directive is bound to the internal event of an element being removed from the tree. The directive is similar to `wedge` except it's only activated when the element is removed:
 
@@ -151,39 +166,65 @@ let node = h "div" [|
   |]
 |]
 ```
-The element will be removed from the document only when the transition ends.
+The element will be removed from the document only when the transition ends. In the case of multiple style properties, it's possibly to be explicit and provide a `~name` argument, e.g. `~name:"opacity"`. The remove handler will then listen to specifically the end of a transition for the `opacity` style property.
 
-It's possible to nest `removeTransition` directives to create multi-layered transitions.
+It's possible to nest `removeTransition` directives to stage multi-layered transitions.
 
 ## Structuring applications
 
-The key to good performance is to do as little work as possible in every iteration of the render loop. Work in the context of this library is both calling into view functions to create the virtual node structures and actually applying those structures on the DOM elements in the document.
+In a Virtual DOM application you'll usually have just one mounted tree. Thus, it's important to get the application structure right and use composition techniques to split up the codebase into logical modules.
 
-### Using predefined nodes
+There is some controversy on what's the right way to program this sort of application. The basic premise of the system is that an event always has to trickle up the tree in order to propagate changes in the other direction. But locally, where the event is fired, we often don't want the code to know too much about what's further up the tree. In other words, it's turtles all the way down, but each turtle shouldn't have to deal with the turtles before it.
 
-This is the most simple way of optimizing your view functions. Simply move static nodes outside of the rendering loop to avoid dynamic allocation:
+Using _components_, we can hook into the event stream and use local state to transform a more specialized event into a more generic event. And conversely, a component also lets us specialize the data model in the other direction.
 
+In addition, we get caching for free because of immutability.
+
+### Components
+
+Components are added using the `component` directive.
 ```ocaml
-let button title message =
-  h "button" [|
-    text title;
-    onClick (fun _ -> message)
-  |]
-
-let signupButton = button "Signup" SignupClicked
+val component : ('b -> ('c, 'd) directive) -> ('c -> 'a) -> 'b -> ('a, 'b) directive
 ```
+That is, a component takes a _view_ function that returns a _child tree_ `('c, 'd)`; a handler that translates messages from the new tree and back to the _parent tree_; and finally, a state variable.
 
-When you're using this predefined signup button in your view code, the library knows that it can safely skip over it when patching.
+Using the "same input, same output" philosophy, the component is only evaluated when the input changes. This comparison uses strict equality which basically means it has to be the exact same object.
 
-### Caching nodes with thunks
+From Elm's documentation (adapted to OCaml):
 
-The strangely named `thunk` directive serves the purpose of avoiding calling into view functions using a caching mechanism. It's inspired by Elm's [Html.Lazy](https://guide.elm-lang.org/optimization/lazy.html) module.:
+> Note: When are two values “the same” though? To optimize for performance, we use JavaScript’s === operator behind the scenes:
+>
+> * Structural equality is used for `int`, `float`, `string` and `bool`.
+> * Reference equality is used for records, lists, custom types, dictionaries, etc.
+>
+> Structural equality means that 4 is the same as 4 no matter how you produced those values. Reference equality means the actual pointer in memory has to be the same. Using reference equality is always cheap O(1), even when the data structure has thousands or millions of entries. So this is mostly about making sure that using lazy will never slow your code down a bunch by accident. All the checks are super cheap!
+
+Within each tree, the component type `'b` is shared. This is typically a variant type with a single view function:
 ```ocaml
-val thunk : ('a -> 'b Virtualdom.t) -> 'a -> 'b Virtualdom.t
-```
-Using the "same input, same output" philosophy, the thunk is only evaluated when the input changes. This comparison uses strict equality which basically means it has to be the exact same object, but importantly, the view function itself must be exactly the same as well.
+type component = [
+      `A of a
+    | `B of b
+]
 
-As when using static nodes (see previous section), you must define the thunk's view function outside of the main rendering loop. Here's an example:
+let view = function
+    `A state -> A.render state
+  | `B state -> B.render state
+```
+This architecture allows us to implement components as independent modules, tagging them from the outside using a variant type.
+
+### Thunks
+
+The strangely named `thunk` directive is a simple caching mechanism.
+```ocaml
+val thunk : ('c -> ('a, 'b) directive) -> 'c -> ('a, 'b) directive
+```
+If the cache key (denoted by the type variable `'c`) changes (strict equality), the rendering function is called. The `thunk` directive is similar to Elm's [Html.Lazy](https://guide.elm-lang.org/optimization/lazy.html) module.
+
+The main difference between thunks and components is that thunks work within the same tree. The input and output directive has the same type variables.
+
+There's an important caveat, however. The rendering function must remain constant (strict equality), typically defined statically outside the rendering loop. This requirement is necessary for the patch and diff algorithm to match up the thunk directives correctly.
+
+For example:
 ```ocaml
 let renderItem item =
   h "div" [|
@@ -196,16 +237,19 @@ let view state =
     Array.map (thunk renderItem) state.items
   )
 ```
+The `renderItem` function is defined outside the rendering loop.
 
-You can use thunks to cache nodes at multiple levels in your application. In fact, the requirement that the function must be defined statically, can be helpful in organizing your view code and avoid excessive nesting.
+### Static nodes
 
-### Strict equality
+Using static nodes is the most simple way of optimizing your view functions. Simply predefine nodes outside of the rendering loop to avoid dynamic allocation altogether.
+```ocaml
+let button title message =
+  h "button" [|
+    text title;
+    onClick (fun _ -> Some message)
+  |]
 
-From Elm's documentation (adapted to OCaml):
+let signupButton = button "Signup" SignupClicked
+```
+When you're using this statically allocated signup button in your view code, the library knows that it can safely skip over it when patching.
 
-> Note: When are two values “the same” though? To optimize for performance, we use JavaScript’s === operator behind the scenes:
->
-> * Structural equality is used for `int`, `float`, `string` and `bool`.
-> * Reference equality is used for records, lists, custom types, dictionaries, etc.
->
-> Structural equality means that 4 is the same as 4 no matter how you produced those values. Reference equality means the actual pointer in memory has to be the same. Using reference equality is always cheap O(1), even when the data structure has thousands or millions of entries. So this is mostly about making sure that using lazy will never slow your code down a bunch by accident. All the checks are super cheap!
