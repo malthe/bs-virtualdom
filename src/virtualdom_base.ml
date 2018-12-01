@@ -361,7 +361,7 @@ let rec patch
             (directive, events, insertionPoint, true, removeTransitions)
         )
       | EventListener (n, _) as d ->
-        (d, 1 lsl n, insertionPoint, (
+        (d, EventSet.make n, insertionPoint, (
             match next with
               EventListener (n', _)
               when n = n' -> false
@@ -427,7 +427,8 @@ let rec patch
                    removeTransitions)
               )
             ) else
-              (d, 1 lsl eventToJs RemoveSelf, insertionPoint, false, [])
+              (d, EventSet.make (eventToJs RemoveSelf),
+               insertionPoint, false, [])
           | _ ->
             if enableRemoveTransitions then (
               let updated, insertionPoint, events, removeTransitions =
@@ -440,7 +441,8 @@ let rec patch
                 true,
                 name::removeTransitions
               )
-            ) else (d, 1 lsl eventToJs RemoveSelf, insertionPoint, true, [])
+            ) else (d, EventSet.make (eventToJs RemoveSelf),
+                    insertionPoint, true, [])
         )
       | Skip as d -> (
           d, 0, insertionPoint, (
@@ -699,7 +701,7 @@ let start element selector view update state =
         let open Webapi.Dom in
         for i = 0 to Array.length browserEvents - 1 do
           let event = Array.get browserEvents i in
-          let mask = 1 lsl (eventToJs event) in
+          let mask = EventSet.make (eventToJs event) in
           let before = events land mask != 0 in
           let after = vnode.events land mask != 0 in
           if before <> after then (

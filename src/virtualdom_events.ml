@@ -99,16 +99,18 @@ let eventName = function
 module EventSet = struct
   type t = int
 
+  let make i = Js.Math.pow_int ~base:2 ~exp:i
+
   let containsBit n i =
-    n land (1 lsl i) != 0
+    n land (make i) != 0
 
   let contains n event =
     containsBit n (eventToJs event)
 
   let childEventToParent n =
     if contains n RemoveSelf then
-      n land (lnot (1 lsl (eventToJs RemoveSelf)))
-      lor (1 lsl (eventToJs RemoveChildren))
+      n land (lnot (make (eventToJs RemoveSelf)))
+      lor (make (eventToJs RemoveChildren))
     else
       n
 end
