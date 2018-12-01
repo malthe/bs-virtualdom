@@ -27,6 +27,7 @@ let appendElement parent child = Element.appendChild child parent
 let appendNode parent child = Node.appendChild child parent
 let createTextNode text = Document.createTextNode text document
 let getElementById id = Document.getElementById id document
+let getProperty element = elementToDict element |> Js.Dict.get
 let getTagName = Element.tagName
 let getId = Element.id
 let getClassName = Element.className
