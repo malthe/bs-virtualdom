@@ -390,7 +390,12 @@ let rec patch
       | Property (name, value) as d -> (
           match next with
             Property (name', value')
-            when name = name' && value = value' ->
+            when name = name' &&
+                 value = value' &&
+                 match getProperty element name with
+                   Some actualValue -> value = actualValue
+                 | None -> value = ""
+            ->
             (d, 0, insertionPoint, false, [])
           | _ ->
             setProperty element name value;
