@@ -693,25 +693,25 @@ let start element selector view update state =
     in
     let () =
       if events != vnode.events then
+        let open Webapi.Dom in
+        let target = Element.asEventTarget element in
         let options = [%bs.obj {
           capture = true;
           passive = true;
           once = false;
         }] in
-        let open Webapi.Dom in
         for i = 0 to Array.length browserEvents - 1 do
           let event = Array.get browserEvents i in
-          let mask = EventSet.make (eventToJs event) in
-          let before = events land mask != 0 in
-          let after = vnode.events land mask != 0 in
+          let before = EventSet.contains events event in
+          let after = EventSet.contains vnode.events event in
           if before <> after then (
-            let target = Element.asEventTarget element in
             let name = eventName event in
             match name with
               Some name ->
               if before then (
                 match Array.get listeners i with
-                  Some f -> removeEventListener target name f options
+                  Some f ->
+                  removeEventListener target name f options
                 | None -> ()
               ) else
                 let f =
