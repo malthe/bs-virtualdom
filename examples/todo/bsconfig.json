@@ -1,0 +1,11 @@
+{
+    "name": "todo",
+    "sources": {"dir": "src"},
+    "bs-dependencies": [
+        "bs-virtualdom",
+        "bs-webapi"
+    ],
+    "package-specs": [{"module": "es6", "in-source": true}],
+    "suffix": ".bs.js",
+    "bsc-flags": ["-color", "always", "-w", "-40+6+7+27+32..39+44+45", "-w @8", "-bs-super-errors -no-alias-deps", "-bs-g"]
+}
