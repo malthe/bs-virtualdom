@@ -82,6 +82,7 @@ let eventName = function
   | Resize -> Some "resize"
   | Scroll -> Some "scroll"
   | Select -> Some "select"
+  | Submit -> Some "submit"
   | TouchCancel -> Some "touchcancel"
   | TouchEnd -> Some "touchend"
   | TouchMove -> Some "touchmove"

@@ -39,6 +39,7 @@ let browserEvents = [|
   Resize;
   Scroll;
   Select;
+  Submit;
   TouchCancel;
   TouchEnd;
   TouchMove;
