@@ -13,7 +13,7 @@ type ('a, 'b) t =
   | Detached of string option * string * ('a,'b) t array
   | EventListener :
       EventSet.t * ('event Dom.event_like -> 'a option) -> ('a, 'b) t
-  | Index of (Js.Dict.key * ('a, 'b) t) array
+  | Index of (Js.Dict.key * ('a, 'b) t) array * EventSet.t option
   | Property of string * string
   | RemoveTransition of string option * ('a, 'b) t array * bool
   | Skip

@@ -28,6 +28,7 @@ val maybe : 'a option -> ('a -> ('a, 'b) t) -> ('a, 'b) t
 
 (** This function mounts the app on an existing DOM element. *)
 val mount :
+  ?namespace:string ->
   Dom.element ->
   ('a -> ('b, 'c) t array) ->
   ('a -> ('b -> unit) -> 'b -> 'a) -> 'a -> unit

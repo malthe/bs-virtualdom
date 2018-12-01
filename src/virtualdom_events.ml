@@ -96,21 +96,35 @@ let eventName = function
   | Wheel -> Some "wheel"
   | _ -> None
 
-module EventSet = struct
+module EventSet : sig
+  type t
+
+  val add : t -> t -> t
+
+  val empty : t
+
+  val make : event -> t
+
+  val contains : event -> t -> bool
+
+  val childEventToParent : t -> t
+end = struct
   type t = int
 
-  let make i = Js.Math.pow_int ~base:2 ~exp:i
+  let add a b = a lor b
 
-  let containsBit n i =
-    n land (make i) != 0
+  let empty = 0
 
-  let contains n event =
-    containsBit n (eventToJs event)
+  let make event = Js.Math.pow_int ~base:2 ~exp:(eventToJs event)
+
+  let contains event =
+    let t = make event in
+    fun n -> n land t != 0
 
   let childEventToParent n =
-    if contains n RemoveSelf then
-      n land (lnot (make (eventToJs RemoveSelf)))
-      lor (make (eventToJs RemoveChildren))
+    if contains RemoveSelf n then
+      n land (lnot (make RemoveSelf))
+      lor (make RemoveChildren)
     else
       n
 end

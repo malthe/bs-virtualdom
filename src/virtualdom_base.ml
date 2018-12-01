@@ -3,7 +3,7 @@ open Virtualdom_misc
 open Virtualdom_events
 open Virtualdom_types
 
-type 'a update = 'a -> unit
+external unsafeEvent : Dom.event -> 'a Dom.event_like = "%identity"
 
 let browserEvents = [|
   Abort;
@@ -53,7 +53,7 @@ let browserEvents = [|
   Wheel;
 |]
 
-let eventListener event f = EventListener (eventToJs event, f)
+let eventListener event f = EventListener (EventSet.make event, f)
 
 let svgNS = "http://www.w3.org/2000/svg"
 
@@ -121,35 +121,39 @@ let rec insertNested parent directives reference =
 
 let rec dispatch
   : 'a 'b.
-    EventSet.t ->
+    (EventSet.t -> bool) ->
     Dom.event ->
-    'a update ->
+    ('a -> unit) ->
     ('a, 'b) t array ->
     Dom.element list ->
     unit =
-  fun i event update directives children ->
+  fun check ev update directives children ->
     Array.iter
       (function
           Attached { element; events; directives }
-          when EventSet.containsBit events i -> (
+          when check events -> (
             match children with
               x::xs when x == element ->
-              dispatch i event update directives xs
+              dispatch check ev update directives xs
             | _ -> ()
           )
         | Component (_, handler, _, Some (d, events))
-          when EventSet.containsBit events i ->
+          when check events ->
           let update message = handler message |. update in
-          dispatch i event update [| d |] children
-        | EventListener (k, f) when i = k ->
-          f (unsafe_identity event) >>?
+          dispatch check ev update [| d |] children
+        | EventListener (event, f) when check event ->
+          f (unsafeEvent ev) >>?
           update
+        | Index (array, Some events)
+          when check events ->
+          let directives = Array.map snd array in
+          dispatch check ev update directives children
         | Thunk (_, _, Some (d, events))
-          when EventSet.containsBit events i ->
-          dispatch i event update [| d |] children
+          when check events ->
+          dispatch check ev update [| d |] children
         | Wedge (directives, Some events)
-          when EventSet.containsBit events i ->
-          dispatch i event update directives children
+          when check events ->
+          dispatch check ev update directives children
         | _ -> ()
       ) directives
 
@@ -163,7 +167,7 @@ let rec patch
     string option ->
     ('a, 'b) t array option ->
     ('a, 'b) t array ->
-    ('a, 'b) t array * Dom.node option * int * string option list =
+    ('a, 'b) t array * Dom.node option * EventSet.t * string option list =
   fun
     ?alwaysReorder:(alwaysReorder=false)
     ?enableRemoveTransitions:(enableRemoveTransitions=false)
@@ -205,7 +209,6 @@ let rec patch
         alwaysReorder
         insertionPoint
         enableRemoveTransitions
-        events
         oldDirectives
         newDirectives =
       let updatedDirectives = Array.make (Array.length newDirectives) Skip in
@@ -221,7 +224,7 @@ let rec patch
             in
             let go events = function
                 (d, newEvents, insertionPoint, isNew, newRemoveTransitions) ->
-                let events = events lor newEvents in
+                let events = EventSet.add events newEvents in
                 if isNew then
                   cleanup existing;
                 set d;
@@ -231,9 +234,9 @@ let rec patch
             in
             go events @@
             update alwaysReorder enableRemoveTransitions existing
-              insertionPoint events current
+              insertionPoint current
           )
-          (oldDirectives, 0, insertionPoint, events, [])
+          (oldDirectives, 0, insertionPoint, EventSet.empty, [])
           newDirectives
       in
       directives >>? (
@@ -247,7 +250,6 @@ let rec patch
     and go2
         insertionPoint
         enableRemoveTransitions
-        events
         oldIndex
         newIndex =
       let keys = Js.Dict.fromArray oldIndex in
@@ -256,12 +258,12 @@ let rec patch
         |> Js.Dict.fromArray
       in
       let oldIndex = Array.copy oldIndex in
-      let updatedIndex = Array.copy newIndex in
+      let updatedIndex = [||] in
 
       let insertionPoint, events, removeTransitions =
         fold_lefti
           (fun (insertionPoint, events, removeTransitions) j (key, current) ->
-             let set value = Array.set updatedIndex j (key, value) in
+             let set value = Array.unsafe_set updatedIndex j (key, value) in
              let existing =
                match Js.Dict.get keys key with
                  Some value ->
@@ -272,7 +274,7 @@ let rec patch
              in
              let go events = function
                  (d, newEvents, insertionPoint, isNew, newRemoveTransitions) ->
-                 let events = events lor newEvents in
+                 let events = EventSet.add events newEvents in
                  if isNew then
                    cleanup existing;
                  set d;
@@ -286,35 +288,34 @@ let rec patch
                enableRemoveTransitions
                existing
                insertionPoint
-               events
                current
              |> go events
-          ) (insertionPoint, events, []) newIndex
+          ) (insertionPoint, EventSet.empty, []) newIndex
       in
       Array.iter cleanup (Array.map snd oldIndex);
       updatedIndex, insertionPoint, events, removeTransitions
 
-    and update alwaysReorder enableRemoveTransitions next insertionPoint events =
+    and update alwaysReorder enableRemoveTransitions next insertionPoint =
       function
         Attribute (ns, name, value) as d -> (
           match next with
             Attribute (ns', name', value')
             when ns = ns' &&
                  name = name' &&
-                 value = value' -> (d, 0, insertionPoint, false, [])
+                 value = value' -> (d, EventSet.empty, insertionPoint, false, [])
           | _ -> (
               match ns with
                 Some ns -> setAttributeNS element ns name value
               | None -> setAttribute element name value
             );
-            (d, 0, insertionPoint, true, [])
+            (d, EventSet.empty, insertionPoint, true, [])
         )
       | ClassName name as d -> (
           match next with
             ClassName name' when name = name' ->
-            (d, 0, insertionPoint, false, [])
+            (d, EventSet.empty, insertionPoint, false, [])
           | _ -> addClassName element name;
-            (d, 0, insertionPoint, true, [])
+            (d, EventSet.empty, insertionPoint, true, [])
         )
       | Component (view, handler, state, _) -> (
           match next with
@@ -326,7 +327,7 @@ let rec patch
                 else
                   getNextSibling d
               in
-              (component, 0, insertionPoint, false, [])
+              (component, EventSet.empty, insertionPoint, false, [])
             else
               let result, insertionPoint, events, removeTransitions =
                 patch
@@ -360,33 +361,35 @@ let rec patch
               ) in
             (directive, events, insertionPoint, true, removeTransitions)
         )
-      | EventListener (n, _) as d ->
-        (d, EventSet.make n, insertionPoint, (
+      | EventListener (event, _) as d ->
+        (d, event, insertionPoint, (
             match next with
-              EventListener (n', _)
-              when n = n' -> false
+              EventListener (event', _)
+              when event = event' -> false
             | _ -> true
           ),
          []
         )
-      | Index d -> (
+      | Index (d, _) -> (
           match next with
-            Index d' ->
+            Index (d', _) ->
             let updated, insertionPoint, events, removeTransitions =
-              go2 insertionPoint enableRemoveTransitions events d' d
+              go2 insertionPoint enableRemoveTransitions d' d
             in
-            (Index updated, events, insertionPoint, false, removeTransitions)
+            (Index (updated, Some events),
+             events, insertionPoint, false, removeTransitions)
           | _ ->
             let directives = Array.map snd d in
             let updated, insertionPoint, events, removeTransitions =
               go1 false insertionPoint
-                enableRemoveTransitions events None directives in
+                enableRemoveTransitions None directives in
             let d =
               Array.mapi
                 (fun i directive -> (Array.get d i |. fst, directive))
                 updated
             in
-            (Index d, events, insertionPoint, true, removeTransitions)
+            (Index (d, Some events),
+             events, insertionPoint, true, removeTransitions)
         )
       | Property (name, value) as d -> (
           match next with
@@ -397,10 +400,10 @@ let rec patch
                    Some actualValue -> value = actualValue
                  | None -> value = ""
             ->
-            (d, 0, insertionPoint, false, [])
+            (d, EventSet.empty, insertionPoint, false, [])
           | _ ->
             setProperty element name value;
-            (d, 0, insertionPoint, true, [])
+            (d, EventSet.empty, insertionPoint, true, [])
         )
       | RemoveTransition (name, directives, _) as d -> (
           match next with
@@ -411,7 +414,7 @@ let rec patch
             then (
               let updated, insertionPoint, events, removeTransitions =
                 go1 alwaysReorder
-                  insertionPoint true events (
+                  insertionPoint true (
                   if active && name = name' then
                     (Some directives')
                   else
@@ -427,13 +430,13 @@ let rec patch
                    removeTransitions)
               )
             ) else
-              (d, EventSet.make (eventToJs RemoveSelf),
+              (d, EventSet.make RemoveSelf,
                insertionPoint, false, [])
           | _ ->
             if enableRemoveTransitions then (
               let updated, insertionPoint, events, removeTransitions =
                 go1 alwaysReorder
-                  insertionPoint false events
+                  insertionPoint false
                   None directives in (
                 RemoveTransition (name, updated, true),
                 events,
@@ -441,11 +444,11 @@ let rec patch
                 true,
                 name::removeTransitions
               )
-            ) else (d, EventSet.make (eventToJs RemoveSelf),
+            ) else (d, EventSet.make RemoveSelf,
                     insertionPoint, true, [])
         )
       | Skip as d -> (
-          d, 0, insertionPoint, (
+          d, EventSet.empty, insertionPoint, (
             match next with
               Skip -> false
             | _ -> true
@@ -457,10 +460,10 @@ let rec patch
             Style (name', value', important')
             when name = name' && value = value' &&
                  important = important' ->
-            (d, 0, insertionPoint, false, [])
+            (d, EventSet.empty, insertionPoint, false, [])
           | _ ->
             setStyle element name value important;
-            (d, 0, insertionPoint, true, [])
+            (d, EventSet.empty, insertionPoint, true, [])
         )
       | Text (_, string) -> (
           match next with
@@ -469,25 +472,27 @@ let rec patch
               setTextContent oldTextNode string;
             if alwaysReorder then
               insert element oldTextNode insertionPoint;
-            (Text (Some oldTextNode, string), 0, insertionPoint, false, [])
+            (Text (Some oldTextNode, string), EventSet.empty,
+             insertionPoint, false, [])
           | _ ->
             let child = createTextNode string in
             insert element child insertionPoint;
-            (Text (Some child, string), 0, insertionPoint, true, [])
+            (Text (Some child, string), EventSet.empty,
+             insertionPoint, true, [])
         )
       | Thunk (state, fn, _) -> (
           match next with
-            Thunk (state', fn', Some (d, _)) as thunk
+            Thunk (state', fn', Some (d, events)) as thunk
             when
-              fn == unsafe_identity fn' &&
-              state == unsafe_identity state' ->
+              strictly_equal_to fn fn' &&
+              strictly_equal_to state state' ->
             let insertionPoint =
               if alwaysReorder then
                 insertNested element [| d |] insertionPoint
               else
                 getNextSibling d
             in
-            (thunk, 0, insertionPoint, false, [])
+            (thunk, events, insertionPoint, false, [])
           | t ->
             let d = fn state in
             let isNew, directives =
@@ -499,15 +504,15 @@ let rec patch
               go1
                 alwaysReorder
                 insertionPoint
-                enableRemoveTransitions events directives (arrayOf d)
+                enableRemoveTransitions directives (arrayOf d)
             in
             let updated = ofArray result events in
             (Thunk (state, fn, Some (updated, events)), events,
              insertionPoint, isNew, removeTransitions)
         )
       | Attached { detached = Some d } ->
-        update alwaysReorder enableRemoveTransitions next insertionPoint events d
-      | Attached _ -> (Skip, 0, insertionPoint, true, [])
+        update alwaysReorder enableRemoveTransitions next insertionPoint d
+      | Attached _ -> (Skip, EventSet.empty, insertionPoint, true, [])
       | Detached (namespace, selector, newDirectives) as detached -> (
           match next with
             Attached ({
@@ -551,7 +556,7 @@ let rec patch
         in
         let updated, insertionPoint, events, removeTransitions =
           go1 alwaysReorder insertionPoint
-            enableRemoveTransitions events directives xs
+            enableRemoveTransitions directives xs
         in
         (Wedge (updated, Some events), events,
          insertionPoint, isNew, removeTransitions)
@@ -589,7 +594,7 @@ let rec patch
              match d with
                Attached vnode ->
                count + (
-                 if EventSet.contains vnode.events RemoveSelf then
+                 if EventSet.contains RemoveSelf vnode.events then
                    let () =
                      removeVNode
                        parent
@@ -600,7 +605,7 @@ let rec patch
                        rm in
                    1
                  else (
-                   if EventSet.contains vnode.events RemoveChildren then
+                   if EventSet.contains RemoveChildren vnode.events then
                      go vnode.element vnode.directives
                    else
                      0
@@ -634,7 +639,7 @@ let rec patch
         let handler event =
           let property =
             Webapi.Dom.TransitionEvent.propertyName
-              (unsafe_identity event)
+              (unsafeEvent event)
           in
           if List.exists (
               function
@@ -643,7 +648,7 @@ let rec patch
             ) removeTransitions
           then
             !r >>? fun f -> removeEventListener target name f options;
-            if EventSet.contains events RemoveSelf then
+            if EventSet.contains RemoveSelf events then
               removeVNodeOwnTransition
                 ~removeTransitions
                 element namespace directives callback
@@ -660,39 +665,30 @@ let rec patch
         callback ()
       in
       let next () =
-        if EventSet.contains events RemoveSelf then
+        if EventSet.contains RemoveSelf events then
           removeVNodeOwnTransition child namespace directives remove
         else
           remove ()
       in
-      if EventSet.contains events RemoveChildren then
+      if EventSet.contains RemoveChildren events then
         removeVNodeNested child directives next
       else
         next ()
 
     in
-    go1 alwaysReorder insertAt enableRemoveTransitions 0
+    go1 alwaysReorder insertAt enableRemoveTransitions
 
-let start element selector view update state =
+let start ?namespace element view update state =
   let listeners = Array.make (Array.length browserEvents) None in
-  let patch vnode update directives =
-    let events = vnode.events in
-    let vnode =
-      let oldDirectives = match vnode.directives with
-          [||] -> None
-        | array -> Some array
+  let patch =
+    let r = ref (EventSet.empty, None) in
+    fun notify newDirectives ->
+      let oldEvents, oldDirectives = !r in
+      let updatedDirectives, _, newEvents, _ =
+        patch element namespace oldDirectives newDirectives
       in
-      let directives, _, events, _ =
-        patch element vnode.namespace oldDirectives directives
-      in {
-        vnode with
-        element;
-        directives;
-        events;
-      }
-    in
-    let () =
-      if events != vnode.events then
+      r := newEvents, Some updatedDirectives;
+      if oldEvents != newEvents then
         let open Webapi.Dom in
         let target = Element.asEventTarget element in
         let options = [%bs.obj {
@@ -702,8 +698,8 @@ let start element selector view update state =
         }] in
         for i = 0 to Array.length browserEvents - 1 do
           let event = Array.get browserEvents i in
-          let before = EventSet.contains events event in
-          let after = EventSet.contains vnode.events event in
+          let before = EventSet.contains event oldEvents in
+          let after = EventSet.contains event newEvents in
           if before <> after then (
             let name = eventName event in
             match name with
@@ -727,30 +723,29 @@ let start element selector view update state =
                       in
                       go @@ (EventTarget.unsafeAsElement @@ Event.target ev)
                     in
-                    dispatch i ev update vnode.directives (List.rev parents)
+                    let _, directives = !r in
+                    dispatch
+                      (EventSet.contains event)
+                      ev notify (
+                      match directives with
+                        Some directives -> directives
+                      | None -> empty
+                    ) (List.rev parents)
                 in
                 addEventListener target name f options;
                 Array.set listeners i (Some f)
             | None -> ()
           )
         done
-    in vnode
   in
-  let vnode = {
-    events = 0;
-    selector;
-    element;
-    directives = empty;
-    detached = None;
-    namespace = None;
-  } in
-  let r = ref vnode in
   let s = ref state in
   let rec go () =
-    r := patch !r controller @@ view !s
-  and controller message =
-    s := update !s controller message;
-    go ()
+    let rec notify message =
+      s := update !s notify message;
+      go ()
+    in
+    let node = view !s in
+    patch notify node
   in
   go ()
 
@@ -787,31 +782,13 @@ module Export = struct
     Detached (namespace, selector, directives)
 
   let keyed array =
-    Index array
+    Index (array, None)
 
   let maybe opt f = match opt with
       Some x -> f x
     | None -> Skip
 
-  let mount element =
-    let join get prefix f s =
-      let t = get element in
-      if Js.String.length t > 0 then
-        s ^ prefix ^ f t
-      else
-        s
-    in
-    let tag = getTagName element |> Js.String.toLowerCase in
-    let selector =
-      tag
-      |> join getId "#" (fun id -> id)
-      |> join getClassName "." (
-        fun name ->
-          Js.String.split name " " |>
-          Js.Array.joinWith "."
-      )
-    in
-    start element selector
+  let mount = start
 
   let removeTransition ?name directives =
     RemoveTransition (name, directives, false)
