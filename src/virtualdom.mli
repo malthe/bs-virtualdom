@@ -24,7 +24,7 @@ val h : ?namespace:string -> string -> ('a, 'b) t array -> ('a, 'b) t
 val keyed : (Js.Dict.key * ('a, 'b) t) array -> ('a, 'b) t
 
 (** Include directive if condition is true. *)
-val maybe : 'a option -> ('a -> ('a, 'b) t) -> ('a, 'b) t
+val maybe : 'c option -> ('c -> ('a, 'b) t) -> ('a, 'b) t
 
 (** This function mounts the app on an existing DOM element. *)
 val mount :
