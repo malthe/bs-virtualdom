@@ -712,7 +712,6 @@ let start ?namespace element view update state =
               ) else
                 let f =
                   fun ev ->
-                    Event.stopPropagation ev;
                     let parents =
                       let rec go child =
                         match Element.parentElement child with
