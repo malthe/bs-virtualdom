@@ -32,8 +32,7 @@ The library provides the following building blocks which are also _directives_:
 
 In addition, `mount` is what you use to attach the main view function to an existing DOM element.
 
-Here's an increment/decrement example:
-
+Below is an increment/decrement app. We've also implemented the [To-Do App](https://malthe.github.io/bs-virtualdom/examples/todo/) – see [source code](examples/todo).
 ```ocaml
 open Virtualdom
 
