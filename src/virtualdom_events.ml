@@ -116,9 +116,8 @@ end = struct
       var hi = 0x80000000;
       var hi1 = ~~(a / hi);
       var hi2 = ~~(b / hi);
-      var big = 2 ** 32;
-      var lo1 = a - ~~(a / big) * big;
-      var lo2 = b - ~~(b / big) * big;
+      var lo1 = a - hi1 * hi;
+      var lo2 = b - hi2 * hi;
       var h = hi1 & hi2;
       var l = lo1 & lo2;
       return h * hi + l;
@@ -130,9 +129,8 @@ end = struct
       var hi = 0x80000000;
       var hi1 = ~~(a / hi);
       var hi2 = ~~(b / hi);
-      var big = 2 ** 32;
-      var lo1 = a - ~~(a / big) * big;
-      var lo2 = b - ~~(b / big) * big;
+      var lo1 = a - hi1 * hi;
+      var lo2 = b - hi2 * hi;
       var h = hi1 | hi2;
       var l = lo1 | lo2;
       return h * hi + l;
