@@ -37,139 +37,139 @@ val mount :
   ('a -> ('b -> unit) -> 'b -> 'a) -> 'a -> unit
 
 (** Bind event listener to the "abort" event. *)
-val onAbort : (Dom.event -> 'a option) -> ('a, 'b) t
+val onAbort : ('a, 'b, Dom.event) listener
 
 (** Bind event listener to the "beforeinput" event. *)
-val onBeforeInput : (Dom.inputEvent -> 'a option) -> ('a, 'b) t
+val onBeforeInput : ('a, 'b, Dom.inputEvent) listener
 
 (** Bind event listener to the "beforeunload" event. *)
-val onBeforeUnload : (Dom.event -> 'a option) -> ('a, 'b) t
+val onBeforeUnload : ('a, 'b, Dom.event) listener
 
 (** Bind event listener to the "blur" event. *)
-val onBlur : (Dom.focusEvent -> 'a option) -> ('a, 'b) t
+val onBlur : ('a, 'b, Dom.focusEvent) listener
 
 (** Bind event listener to the "change" event. *)
-val onChange : (Dom.event -> 'a option) -> ('a, 'b) t
+val onChange : ('a, 'b, Dom.event) listener
 
 (** Bind event listener to the "click" event. *)
-val onClick : (Dom.mouseEvent -> 'a option) -> ('a, 'b) t
+val onClick : ('a, 'b, Dom.mouseEvent) listener
 
 (** Bind event listener to the "dblclick" event. *)
-val onDblClick : (Dom.mouseEvent -> 'a option) -> ('a, 'b) t
+val onDblClick : ('a, 'b, Dom.mouseEvent) listener
 
 (** Bind event listener to the "dragend" event. *)
-val onDragEnd : (Dom.dragEvent -> 'a option) -> ('a, 'b) t
+val onDragEnd : ('a, 'b, Dom.dragEvent) listener
 
 (** Bind event listener to the "dragenter" event. *)
-val onDragEnter : (Dom.dragEvent -> 'a option) -> ('a, 'b) t
+val onDragEnter : ('a, 'b, Dom.dragEvent) listener
 
 (** Bind event listener to the "dragexit" event. *)
-val onDragExit : (Dom.dragEvent -> 'a option) -> ('a, 'b) t
+val onDragExit : ('a, 'b, Dom.dragEvent) listener
 
 (** Bind event listener to the "dragleave" event. *)
-val onDragLeave : (Dom.dragEvent -> 'a option) -> ('a, 'b) t
+val onDragLeave : ('a, 'b, Dom.dragEvent) listener
 
 (** Bind event listener to the "dragover" event. *)
-val onDragOver : (Dom.dragEvent -> 'a option) -> ('a, 'b) t
+val onDragOver : ('a, 'b, Dom.dragEvent) listener
 
 (** Bind event listener to the "dragstart" event. *)
-val onDragStart : (Dom.dragEvent -> 'a option) -> ('a, 'b) t
+val onDragStart : ('a, 'b, Dom.dragEvent) listener
 
 (** Bind event listener to the "drop" event. *)
-val onDrop : (Dom.dragEvent -> 'a option) -> ('a, 'b) t
+val onDrop : ('a, 'b, Dom.dragEvent) listener
 
 (** Bind event listener to the "focus" event. *)
-val onFocus : (Dom.focusEvent -> 'a option) -> ('a, 'b) t
+val onFocus : ('a, 'b, Dom.focusEvent) listener
 
 (** Bind event listener to the "focusin" event. *)
-val onFocusIn : (Dom.focusEvent -> 'a option) -> ('a, 'b) t
+val onFocusIn : ('a, 'b, Dom.focusEvent) listener
 
 (** Bind event listener to the "focusout" event. *)
-val onFocusOut : (Dom.focusEvent -> 'a option) -> ('a, 'b) t
+val onFocusOut : ('a, 'b, Dom.focusEvent) listener
 
 (** Bind event listener to the "input" event. *)
-val onInput : (Dom.inputEvent -> 'a option) -> ('a, 'b) t
+val onInput : ('a, 'b, Dom.inputEvent) listener
 
 (** Bind event listener to the "keydown" event. *)
-val onKeyDown : (Dom.keyboardEvent -> 'a option) -> ('a, 'b) t
+val onKeyDown : ('a, 'b, Dom.keyboardEvent) listener
 
 (** Bind event listener to the "keypress" event. *)
-val onKeyPress : (Dom.keyboardEvent -> 'a option) -> ('a, 'b) t
+val onKeyPress : ('a, 'b, Dom.keyboardEvent) listener
 
 (** Bind event listener to the "keyup" event. *)
-val onKeyUp : (Dom.keyboardEvent -> 'a option) -> ('a, 'b) t
+val onKeyUp : ('a, 'b, Dom.keyboardEvent) listener
 
 (** Bind event listener to the "load" event. *)
-val onLoad : (Dom.inputEvent -> 'a option) -> ('a, 'b) t
+val onLoad : ('a, 'b, Dom.inputEvent) listener
 
 (** Bind event listener to the "mousedown" event. *)
-val onMouseDown : (Dom.mouseEvent -> 'a option) -> ('a, 'b) t
+val onMouseDown : ('a, 'b, Dom.mouseEvent) listener
 
 (** Bind event listener to the "mouseenter" event. *)
-val onMouseEnter : (Dom.mouseEvent -> 'a option) -> ('a, 'b) t
+val onMouseEnter : ('a, 'b, Dom.mouseEvent) listener
 
 (** Bind event listener to the "mouseleave" event. *)
-val onMouseLeave : (Dom.mouseEvent -> 'a option) -> ('a, 'b) t
+val onMouseLeave : ('a, 'b, Dom.mouseEvent) listener
 
 (** Bind event listener to the "mousemove" event. *)
-val onMouseMove : (Dom.mouseEvent -> 'a option) -> ('a, 'b) t
+val onMouseMove : ('a, 'b, Dom.mouseEvent) listener
 
 (** Bind event listener to the "mouseout" event. *)
-val onMouseOut : (Dom.mouseEvent -> 'a option) -> ('a, 'b) t
+val onMouseOut : ('a, 'b, Dom.mouseEvent) listener
 
 (** Bind event listener to the "mouseup" event. *)
-val onMouseUp : (Dom.mouseEvent -> 'a option) -> ('a, 'b) t
+val onMouseUp : ('a, 'b, Dom.mouseEvent) listener
 
 (** Bind event listener to the "popstate" event. *)
-val onPopState : (Dom.event -> 'a option) -> ('a, 'b) t
+val onPopState : ('a, 'b, Dom.event) listener
 
 (** Bind event listener to the "readystatechange" event. *)
-val onReadyStateChange : (Dom.event -> 'a option) -> ('a, 'b) t
+val onReadyStateChange : ('a, 'b, Dom.event) listener
 
 (** Bind event listener to the "resize" event. *)
-val onResize : (Dom.event -> 'a option) -> ('a, 'b) t
+val onResize : ('a, 'b, Dom.event) listener
 
 (** Bind event listener to the "scroll" event. *)
-val onScroll : (Dom.uiEvent -> 'a option) -> ('a, 'b) t
+val onScroll : ('a, 'b, Dom.uiEvent) listener
 
 (** Bind event listener to the "select" event. *)
-val onSelect : (Dom.event -> 'a option) -> ('a, 'b) t
+val onSelect : ('a, 'b, Dom.event) listener
 
 (** Bind event listener to the "submit" event. *)
-val onSubmit : (Dom.event -> 'a option) -> ('a, 'b) t
+val onSubmit : ('a, 'b, Dom.event) listener
 
 (** Bind event listener to the "touchcancel" event. *)
-val onTouchCancel : (Dom.touchEvent -> 'a option) -> ('a, 'b) t
+val onTouchCancel : ('a, 'b, Dom.touchEvent) listener
 
 (** Bind event listener to the "touchend" event. *)
-val onTouchEnd : (Dom.touchEvent -> 'a option) -> ('a, 'b) t
+val onTouchEnd : ('a, 'b, Dom.touchEvent) listener
 
 (** Bind event listener to the "touchmove" event. *)
-val onTouchMove : (Dom.touchEvent -> 'a option) -> ('a, 'b) t
+val onTouchMove : ('a, 'b, Dom.touchEvent) listener
 
 (** Bind event listener to the "touchstart" event. *)
-val onTouchStart : (Dom.touchEvent -> 'a option) -> ('a, 'b) t
+val onTouchStart : ('a, 'b, Dom.touchEvent) listener
 
 (** Bind event listener to the "transitioncancel" event. *)
-val onTransitionCancel : (Dom.transitionEvent -> 'a option) -> ('a, 'b) t
+val onTransitionCancel : ('a, 'b, Dom.transitionEvent) listener
 
 (** Bind event listener to the "transitionend" event. *)
-val onTransitionEnd : (Dom.transitionEvent -> 'a option) -> ('a, 'b) t
+val onTransitionEnd : ('a, 'b, Dom.transitionEvent) listener
 
 (** Bind event listener to the "transitionrun" event. *)
-val onTransitionRun : (Dom.transitionEvent -> 'a option) -> ('a, 'b) t
+val onTransitionRun : ('a, 'b, Dom.transitionEvent) listener
 
 (** Bind event listener to the "transitionstart" event. *)
-val onTransitionStart : (Dom.transitionEvent -> 'a option) -> ('a, 'b) t
+val onTransitionStart : ('a, 'b, Dom.transitionEvent) listener
 
 (** Bind event listener to the "unhandledrejection" event. *)
-val onUnhandledRejection : (Dom.event -> 'a option) -> ('a, 'b) t
+val onUnhandledRejection : ('a, 'b, Dom.event) listener
 
 (** Bind event listener to the "unload" event. *)
-val onUnload : (Dom.event -> 'a option) -> ('a, 'b) t
+val onUnload : ('a, 'b, Dom.event) listener
 
 (** Bind event listener to the "wheel" event. *)
-val onWheel : (Dom.wheelEvent -> 'a option) -> ('a, 'b) t
+val onWheel : ('a, 'b, Dom.wheelEvent) listener
 
 (** Set an element property. *)
 val prop : string -> string -> ('a, 'b) t

@@ -130,7 +130,9 @@ Additional documentation can be found in the [module signature](src/virtualdom.m
 
 The library comes with functions to bind to the most commonly used browser events.
 ```ocaml
-val onClick : (Dom.mouseEvent -> 'a option) -> ('a, 'b) t
+val onClick :
+  ?passive:bool ->
+  (Dom.mouseEvent -> 'a option) -> ('a, 'b) t
 ```
 They're named exactly like their browser counterpart except for the camel-casing. In order to actually pull out information from the events, you can use [bs-webapi](https://www.npmjs.com/package/bs-webapi) which is already pulled in as a dependency of this library.
 
