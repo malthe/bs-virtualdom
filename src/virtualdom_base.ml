@@ -293,35 +293,35 @@ let rec patch
         fold_lefti
           (fun (insertionPoint, enabledEvents,
                 passiveEvents, removeTransitions) j (key, current) ->
-             let set value = Array.unsafe_set updatedIndex j (key, value) in
-             let existing =
-               match Js.Dict.get keys key with
-                 Some value ->
-                 Js.Dict.get reverse key >>?
-                 (fun i -> Array.set oldIndex i (key, Skip));
-                 value
-               | None -> Skip
-             in
-             let go enabledEvents passiveEvents = function
-                 (d, enabledEvents', passiveEvents',
-                  insertionPoint, isNew, newRemoveTransitions) ->
-                 let enabledEvents = EventSet.add enabledEvents enabledEvents' in
-                 let passiveEvents = EventSet.add passiveEvents passiveEvents' in
-                 if isNew then
-                   cleanup existing;
-                 set d;
-                 let removeTransitions =
-                   removeTransitions @ newRemoveTransitions
-                 in
-                 (insertionPoint, enabledEvents, passiveEvents, removeTransitions)
-             in
-             update
-               true
-               enableRemoveTransitions
-               existing
-               insertionPoint
-               current
-             |> go enabledEvents passiveEvents
+            let set value = Array.unsafe_set updatedIndex j (key, value) in
+            let existing =
+              match Js.Dict.get keys key with
+                Some value ->
+                Js.Dict.get reverse key >>?
+                (fun i -> Array.set oldIndex i (key, Skip));
+                value
+              | None -> Skip
+            in
+            let go enabledEvents passiveEvents = function
+                (d, enabledEvents', passiveEvents',
+                 insertionPoint, isNew, newRemoveTransitions) ->
+                let enabledEvents = EventSet.add enabledEvents enabledEvents' in
+                let passiveEvents = EventSet.add passiveEvents passiveEvents' in
+                if isNew then
+                  cleanup existing;
+                set d;
+                let removeTransitions =
+                  removeTransitions @ newRemoveTransitions
+                in
+                (insertionPoint, enabledEvents, passiveEvents, removeTransitions)
+            in
+            update
+              true
+              enableRemoveTransitions
+              existing
+              insertionPoint
+              current
+            |> go enabledEvents passiveEvents
           ) (insertionPoint, EventSet.empty, EventSet.empty, []) newIndex
       in
       Array.iter cleanup (Array.map snd oldIndex);
@@ -403,12 +403,12 @@ let rec patch
       | EventListener (event, passive, _) as d ->
         (d, event, (if passive then event else EventSet.empty),
          insertionPoint, (
-            match next with
-              EventListener (event', passive', _)
-              when event = event' &&
-                   passive = passive' -> false
-            | _ -> true
-          ),
+           match next with
+             EventListener (event', passive', _)
+             when event = event' &&
+                  passive = passive' -> false
+           | _ -> true
+         ),
          []
         )
       | Index d -> (
@@ -420,7 +420,7 @@ let rec patch
             in
             (Index updated,
              enabledEvents, passiveEvents,
-            insertionPoint, false, removeTransitions)
+             insertionPoint, false, removeTransitions)
           | _ ->
             let directives = Array.map snd d in
             let updated, insertionPoint,
