@@ -201,6 +201,14 @@ let rec patch
           (Some (arrayOf d))
           empty
         |> ignore
+      | Index d ->
+        patch
+          ~enableRemoveTransitions:true
+          element
+          defaultNamespace
+          (Some (Array.map snd d))
+          empty
+        |> ignore
       | Property (name, _) -> removeProperty element name
       | Style (name, _, _) -> removeStyle element name
       | Text (Some node, _) -> removeElement element node
