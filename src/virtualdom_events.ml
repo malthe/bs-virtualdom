@@ -109,22 +109,56 @@ module EventSet : sig
 
   val childEventToParent : t -> t
 end = struct
-  type t = int
+  type t = float
 
-  let add a b = a lor b
+  let (land) : (float -> float -> float) = [%raw {|
+    function(a, b) {
+      var hi = 0x80000000;
+      var hi1 = ~~(a / hi);
+      var hi2 = ~~(b / hi);
+      var big = 2 ** 32;
+      var lo1 = a - ~~(a / big) * big;
+      var lo2 = b - ~~(b / big) * big;
+      var h = hi1 & hi2;
+      var l = lo1 & lo2;
+      return h * hi + l;
+    }
+  |}]
 
-  let empty = 0
+  let (lor) : (float -> float -> float) = [%raw {|
+    function(a, b) {
+      var hi = 0x80000000;
+      var hi1 = ~~(a / hi);
+      var hi2 = ~~(b / hi);
+      var big = 2 ** 32;
+      var lo1 = a - ~~(a / big) * big;
+      var lo2 = b - ~~(b / big) * big;
+      var h = hi1 | hi2;
+      var l = lo1 | lo2;
+      return h * hi + l;
+    }
+  |}]
 
-  let make event = Js.Math.pow_int ~base:2 ~exp:(eventToJs event)
+  let add a b =
+    a lor b
+
+  let empty = float_of_int 0
+
+  let make event =
+    let exp = eventToJs event in
+    Js.Math.pow_int ~base:2 ~exp |. float_of_int
 
   let contains event =
     let t = make event in
-    fun n -> n land t != 0
+    fun n ->
+      if n >= t then
+        n land t != 0.0
+      else
+        false
 
   let childEventToParent n =
-    if contains RemoveSelf n then
-      n land (lnot (make RemoveSelf))
-      lor (make RemoveChildren)
+    if n > 0.0 && contains RemoveSelf n then
+      add (n -. make RemoveSelf) (make RemoveChildren)
     else
       n
 end
