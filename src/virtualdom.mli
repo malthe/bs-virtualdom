@@ -9,7 +9,10 @@ val attr : ?namespace:string -> string -> string -> ('a, 'b) t
 val className : string -> ('a, 'b) t
 
 (** Include a component. *)
-val component : ('b -> ('c, 'd) t) -> ('c -> 'a) -> 'b -> ('a, 'b) t
+val component :
+  ('b -> ('c, 'd) t) ->
+  (('c -> unit) -> 'c -> 'a) ->
+  'b -> ('a, 'b) t
 
 (** Include directive if condition is true. *)
 val cond : bool -> ('a, 'b) t -> ('a, 'b) t

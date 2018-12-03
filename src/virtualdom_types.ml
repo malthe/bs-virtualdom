@@ -5,7 +5,7 @@ type ('a, 'b) t =
   | Attribute of string option * string * string
   | Component : (
       ('b -> ('c, 'd) t) *
-      ('c -> 'a) *
+      (('c -> unit) -> 'c -> 'a) *
       'b *
       (('c, 'd) t * EventSet.t) option
     ) -> ('a, 'b) t

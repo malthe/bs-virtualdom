@@ -139,7 +139,11 @@ let rec dispatch
           )
         | Component (_, handler, _, Some (d, events))
           when check events ->
-          let update message = handler message |. update in
+          let update message =
+            let rec notify message =
+              handler notify message |. update
+            in
+            handler notify message |. update in
           dispatch check ev update [| d |] children
         | EventListener (event, f) when check event ->
           f (unsafeEvent ev) >>?
