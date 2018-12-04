@@ -14,6 +14,7 @@ It's got a small footprint. Just over 7KB compressed.
 * [Events](#events)
 * [Transitions](#transitions)
 * [Structuring applications](#structuring-applications)
+* [FAQ](#faq)
 
 ## Introduction
 
@@ -254,3 +255,10 @@ let signupButton = button "Signup" SignupClicked
 ```
 When you're using this statically allocated signup button in your view code, the library knows that it can safely skip over it when patching.
 
+## FAQ
+
+1. _Why isn't `onClick` getting called?_ Perhaps you've already detached the corresponding vnode from the tree. This would prevent the dispatcher from locating the event handler. Note that a remove transition does not prevent an element from being detached from the parent tree.
+
+   Possible related answer:
+
+   - [Listen to `mousedown` instead of `click`](https://stackoverflow.com/questions/10652852/jquery-fire-click-before-blur-event)
