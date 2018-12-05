@@ -854,8 +854,12 @@ let start ?namespace element view update state =
   let s = ref state in
   let rec go () =
     let rec notify message =
-      s := update !s notify message;
-      go ()
+      let prev = !s in
+      let next = update !s notify message in
+      if prev != next then (
+        s := next;
+        go ()
+      )
     in
     let node = view !s in
     patch notify node
