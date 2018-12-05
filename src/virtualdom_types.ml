@@ -10,7 +10,9 @@ type ('a, 'b) t =
       (('c, 'd) t * EventSet.t * EventSet.t) option
     ) -> ('a, 'b) t
   | ClassName of string
-  | Detached of string option * string * ('a,'b) t array
+  | Detached of
+      string option * string *
+      (Dom.element -> 'a option) option * ('a,'b) t array
   | EventListener :
       EventSet.t * bool * ('event Dom.event_like -> 'a option) -> ('a, 'b) t
   | Index of (Js.Dict.key * ('a, 'b) t) array

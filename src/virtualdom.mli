@@ -21,7 +21,10 @@ val cond : bool -> ('a, 'b) t -> ('a, 'b) t
 val empty : ('a, 'b) t array
 
 (** This function returns a new virtual DOM node. *)
-val h : ?namespace:string -> string -> ('a, 'b) t array -> ('a, 'b) t
+val h :
+  ?namespace:string ->
+  ?onInsert:(Dom.element -> 'a option) ->
+  string -> ('a, 'b) t array -> ('a, 'b) t
 
 (** This function inserts an keyed array of directives. *)
 val keyed : (Js.Dict.key * ('a, 'b) t) array -> ('a, 'b) t

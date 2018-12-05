@@ -82,7 +82,12 @@ The `update` function will often have to deal with asynchronous logic. This is i
 
 The `h` function creates a vnode from a selector such as `"div#main.app-like"` and an array of _child directives_.
 ```ocaml
-val h : ?namespace:string -> string -> ('a, 'b) directive array -> ('a, 'b) directive
+val h :
+  ?namespace:string ->
+  ?onInsert:(Dom.element -> 'a option) ->
+  string ->
+  ('a, 'b) directive array ->
+  ('a, 'b) directive
 ```
 The type variable `'a` is the message type (see the example in the introduction). The `'b` type variable is used when writing components. The return value is a virtual node, but it's also a directive in its own right. This is how we add child nodes:
 ```ocaml
@@ -98,6 +103,8 @@ An overview of the directives is presented in the next section, but it's importa
 
 This library uses a reconciliation algorithm similar to [React](https://reactjs.org/docs/reconciliation.html), also known as "patch and diff". Basically, the library matches the old, _attached_ tree with the new, _detached_ tree and makes the required changes. Ideally, the minimum amount of changes required, but the algorithm is rather simple. To match an old node with a new one, it lines up the arrays of directives and makes at most one comparison. What this effectively means is that we need a special mechanism to deal with reorderings.
 
+### Using keys
+
 In a situation where we're reordering children and/or adding and removing them, we need to equip the patch and diff algorithm with a unique key for each child. The algorithm will still apply the reconciliation algorithm to keyed child nodes, but it will be able to do so without removing and creating the elements from scratch (why slows down our app and causes unnecessary reflowing.)
 
 This mechanism is activated through the use of the `keyed` function.
@@ -105,6 +112,12 @@ This mechanism is activated through the use of the `keyed` function.
 val keyed : (Js.Dict.key * ('a, 'b) directive) array -> ('a, 'b) directive
 ```
 It's like a wedge, but lets you specify a string for each directive (typically a vnode). This string is then used as the key in a lookup table in order to (possibly) locate the old directive and match it with the new one.
+
+### Hooks
+
+- `onInsert`
+
+  The `onInsert` hook is called immediately after the patch cycle when an element is created and inserted into the DOM. The return value is an optional message. This is useful for example to start up an asynchronous initialization routine such as loading external data or starting an animation effect.
 
 ## Directives
 
