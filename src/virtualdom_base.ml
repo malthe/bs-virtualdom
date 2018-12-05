@@ -5,6 +5,8 @@ open Virtualdom_types
 
 external unsafeEvent : Dom.event -> 'a Dom.event_like = "%identity"
 
+external safeIdentity : 'a -> 'a = "%identity"
+
 let browserEvents = [|
   Abort;
   BeforeInput;
@@ -366,7 +368,9 @@ let rec patch
       | Component (view, handler, state, _) -> (
           match next with
             Component (view', handler', state',
-                       Some (d, enabledEvents, passiveEvents)) as component ->
+                       Some (d, enabledEvents, passiveEvents)) as component
+            when strictly_equal_to view view' &&
+                 strictly_equal_to handler handler' ->
             if state == state' then
               let insertionPoint =
                 if alwaysReorder then
@@ -888,8 +892,11 @@ module Export = struct
   let className name =
     ClassName name
 
-  let component view handler state =
-    Component (view, handler, state, None)
+  let component view handler =
+    let view = safeIdentity view in
+    let handler = safeIdentity handler in
+    fun state ->
+      Component (view, handler, state, None)
 
   let cond b directive = if b then directive else Skip
 
