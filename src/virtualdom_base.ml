@@ -219,7 +219,9 @@ let rec patch
           (Some (Array.map snd d))
           empty
         |> ignore
-      | Property (name, _) -> removeProperty element name
+      | Property (name, _) ->
+        setProperty element name "";
+        removeProperty element name
       | Style (name, _, _) -> removeStyle element name
       | Text (Some node, _) -> removeElement element node
       | Thunk (_, _, Some (d, _, _)) -> cleanup d
@@ -347,18 +349,24 @@ let rec patch
         (d, EventSet.empty, EventSet.empty, insertionPoint, isNew, [], [])
       in
       function
-        Attribute (ns, name, value) as d -> (
+        Attribute (ns, name, value) as d ->
+        let set () =
+          match ns with
+            Some ns -> setAttributeNS element ns name value
+          | None -> setAttribute element name value
+        in (
           match next with
             Attribute (ns', name', value')
             when ns = ns' &&
-                 name = name' &&
-                 value = value' -> simple d false
+                 name = name' ->
+            if value = value' then
+              simple d false
+            else (
+              set (); simple d false
+            )
           | _ -> (
-              match ns with
-                Some ns -> setAttributeNS element ns name value
-              | None -> setAttribute element name value
-            );
-            simple d true
+              set (); simple d true
+            )
         )
       | ClassName name as d -> (
           match next with
@@ -459,13 +467,15 @@ let rec patch
       | Property (name, value) as d -> (
           match next with
             Property (name', value')
-            when name = name' &&
-                 value = value' &&
-                 match getProperty element name with
-                   Some actualValue -> value = actualValue
-                 | None -> value = ""
-            -> simple d false
-          | _ -> setProperty element name value; simple d true
+            when name = name' ->
+            if value = value' then
+              simple d false
+            else (
+              setProperty element name value;
+              simple d false
+            )
+          | _ ->
+            setProperty element name value; simple d true
         )
       | RemoveTransition (name, directives, _) as d -> (
           match next with
@@ -525,9 +535,17 @@ let rec patch
       | Style (name, value, important) as d -> (
           match next with
             Style (name', value', important')
-            when name = name' && value = value' &&
-                 important = important' -> simple d false
-          | _ -> setStyle element name value important; simple d true
+            when name = name' ->
+            if value = value' &&
+               important = important' then
+              simple d false
+            else (
+              setStyle element name value important;
+              simple d false
+            )
+          | _ ->
+            setStyle element name value important;
+            simple d true
         )
       | Text (_, string) -> (
           match next with

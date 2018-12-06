@@ -12,7 +12,7 @@ export default {
   },
   plugins: [
     nodeResolve({module: true, browser: true}),
-    commonjs(),
-    terser()
+    commonjs()
+    //terser()
   ]
 };
