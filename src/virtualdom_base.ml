@@ -4,6 +4,7 @@ open Virtualdom_events
 open Virtualdom_types
 
 external unsafeEvent : Dom.event -> 'a Dom.event_like = "%identity"
+external unsafeDirective : 'a t -> 'b t = "%identity"
 
 external safeIdentity : 'a -> 'a = "%identity"
 
@@ -131,11 +132,11 @@ let notifier update handler =
   update
 
 let rec dispatch
-  : 'a 'b.
+  : 'a.
     (EventSet.t -> EventSet.t -> bool) ->
     Dom.event ->
     ('a -> unit) ->
-    ('a, 'b) t array ->
+    'a t array ->
     Dom.element list ->
     unit =
   fun check ev update directives children ->
@@ -174,7 +175,7 @@ let rec dispatch
       ) directives
 
 let rec patch
-  : 'a 'b.
+  : 'a.
     ?alwaysReorder:bool ->
     ?enableRemoveTransitions:bool ->
     ?notifyRemoveTransitions:string option list ->
@@ -182,9 +183,9 @@ let rec patch
     Dom.element ->
     string option ->
     ('a -> unit) ->
-    ('a, 'b) t array option ->
-    ('a, 'b) t array -> (
-      ('a, 'b) t array *
+    'a t array option ->
+    'a t array -> (
+      'a t array *
       Dom.node option *
       EventSet.t *
       EventSet.t *
@@ -375,11 +376,10 @@ let rec patch
         )
       | Component (view, handler, state, _) -> (
           match next with
-            Component (view', handler', state',
+            Component (view', _, state',
                        Some (d, enabledEvents, passiveEvents)) as component
-            when strictly_equal_to view view' &&
-                 strictly_equal_to handler handler' ->
-            if state == state' then
+            when strictly_equal_to view view' ->
+            if strictly_equal_to state state' then
               let insertionPoint =
                 if alwaysReorder then
                   insertNested element [| d |] insertionPoint
@@ -397,13 +397,13 @@ let rec patch
                   ?insertAt:insertionPoint
                   element
                   defaultNamespace
-                  (notifier notify handler')
-                  (Some (arrayOf d))
-                  (view' state |. arrayOf)
+                  (notifier notify handler)
+                  (Some (arrayOf (unsafeDirective d)))
+                  (view state |. arrayOf)
               in
               let d = ofArray result enabledEvents passiveEvents in
               let directive = Component (
-                  view', handler', state, Some (d, enabledEvents, passiveEvents)
+                  view, handler, state, Some (d, enabledEvents, passiveEvents)
                 ) in
               (directive, enabledEvents, passiveEvents,
                insertionPoint, false, removeTransitions, callbacks)
@@ -902,7 +902,7 @@ module Event = struct
 end
 
 module Export = struct
-  type ('a, 'b) directive = ('a, 'b) t
+  type 'a directive = 'a t
 
   let attr ?namespace name value =
     Attribute (namespace, name, value)
@@ -910,10 +910,9 @@ module Export = struct
   let className name =
     ClassName name
 
-  let component view handler =
+  let component view =
     let view = safeIdentity view in
-    let handler = safeIdentity handler in
-    fun state ->
+    fun handler state ->
       Component (view, handler, state, None)
 
   let cond b directive = if b then directive else Skip

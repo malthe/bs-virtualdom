@@ -86,10 +86,10 @@ val h :
   ?namespace:string ->
   ?onInsert:(Dom.element -> 'a option) ->
   string ->
-  ('a, 'b) directive array ->
-  ('a, 'b) directive
+  'a directive array ->
+  'a directive
 ```
-The type variable `'a` is the message type (see the example in the introduction). The `'b` type variable is used when writing components. The return value is a virtual node, but it's also a directive in its own right. This is how we add child nodes:
+The type variable `'a` is the message type (see the example in the introduction). The return value is a virtual node, but it's also a directive in its own right. This is how we add child nodes:
 ```ocaml
 let greeting =
   h "div" [|
@@ -109,7 +109,7 @@ In a situation where we're reordering children and/or adding and removing them, 
 
 This mechanism is activated through the use of the `keyed` function.
 ```ocaml
-val keyed : (Js.Dict.key * ('a, 'b) directive) array -> ('a, 'b) directive
+val keyed : (Js.Dict.key * 'a directive) array -> 'a directive
 ```
 It's like a wedge, but lets you specify a string for each directive (typically a vnode). This string is then used as the key in a lookup table in order to (possibly) locate the old directive and match it with the new one.
 
@@ -146,7 +146,7 @@ The library comes with functions to bind to the most commonly used browser event
 ```ocaml
 val onClick :
   ?passive:bool ->
-  (Dom.mouseEvent -> 'a option) -> ('a, 'b) t
+  (Dom.mouseEvent -> 'a option) -> 'a t
 ```
 They're named exactly like their browser counterpart except for the camel-casing. In order to actually pull out information from the events, you can use [bs-webapi](https://www.npmjs.com/package/bs-webapi) which is already pulled in as a dependency of this library.
 
@@ -199,11 +199,11 @@ In addition, we get caching for free because of immutability.
 
 Components are added using the `component` directive.
 ```ocaml
-val component : ('b -> ('c, 'd) directive) -> ('c -> 'a) -> 'b -> ('a, 'b) directive
+val component : ('b -> 'c directive) -> ('c -> 'a) -> 'b -> 'a directive
 ```
-That is, a component takes a _view_ function that returns a _child tree_ `('c, 'd)`; a handler that translates messages from the new tree and back to the _parent tree_; and finally, a state variable.
+That is, a component is a directive of type `'a` which takes a _view_ function returning a directive of type `'c`, a _handler_ function that does one-way translation from `'c` into `'a`, and finally, a _state_ parameter.
 
-Using the "same input, same output" philosophy, the component is only evaluated when the input changes. This comparison uses strict equality which basically means it has to be the exact same object.
+Using the "same input, same output" philosophy, the component is only evaluated when the input changes (strict equality). Note that the _view_ function must remain constant.
 
 From Elm's documentation (adapted to OCaml):
 
@@ -214,30 +214,15 @@ From Elm's documentation (adapted to OCaml):
 >
 > Structural equality means that 4 is the same as 4 no matter how you produced those values. Reference equality means the actual pointer in memory has to be the same. Using reference equality is always cheap O(1), even when the data structure has thousands or millions of entries. So this is mostly about making sure that using lazy will never slow your code down a bunch by accident. All the checks are super cheap!
 
-Within each tree, the component type `'b` is shared. This is typically a variant type with a single view function:
-```ocaml
-type component = [
-      `A of a
-    | `B of b
-]
-
-let view = function
-    `A state -> A.render state
-  | `B state -> B.render state
-```
-This architecture allows us to implement components as independent modules, tagging them from the outside using a variant type.
-
 ### Thunks
 
 The strangely named `thunk` directive is a simple caching mechanism.
 ```ocaml
-val thunk : ('c -> ('a, 'b) directive) -> 'c -> ('a, 'b) directive
+val thunk : ('b -> 'a directive) -> 'b -> 'a directive
 ```
-If the cache key (denoted by the type variable `'c`) changes (strict equality), the rendering function is called. The `thunk` directive is similar to Elm's [Html.Lazy](https://guide.elm-lang.org/optimization/lazy.html) module.
+If the cache key (denoted by the type variable `'b`) changes (strict equality), the view function is called. The `thunk` directive is similar to Elm's [Html.Lazy](https://guide.elm-lang.org/optimization/lazy.html) module.
 
-The main difference between thunks and components is that thunks work within the same tree. The input and output directive has the same type variables.
-
-There's an important caveat, however. The rendering function must remain constant (strict equality), typically defined statically outside the rendering loop. This requirement is necessary for the patch and diff algorithm to match up the thunk directives correctly.
+The main difference between thunks and components is that components are able to lift the message type. Like components, the view function must remain constant.
 
 For example:
 ```ocaml
