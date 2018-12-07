@@ -183,7 +183,7 @@ let rec patch
     Dom.element ->
     string option ->
     ('a -> unit) ->
-    'a t array option ->
+    'a t array ->
     'a t array -> (
       'a t array *
       Dom.node option *
@@ -208,7 +208,7 @@ let rec patch
           element
           defaultNamespace
           (notifier notify handler)
-          (Some (arrayOf d))
+          (arrayOf d)
           empty
         |> ignore
       | Index d ->
@@ -217,7 +217,7 @@ let rec patch
           element
           defaultNamespace
           notify
-          (Some (Array.map snd d))
+          (Array.map snd d)
           empty
         |> ignore
       | Property (name, _) ->
@@ -257,9 +257,10 @@ let rec patch
             j current ->
             let set = Array.set updatedDirectives j in
             let existing =
-              match directives with
-                Some directives -> Array.get directives i
-              | None -> Skip
+              if Array.length directives > i then
+                Array.get directives i
+              else
+                Skip
             in
             let go enabledEvents passiveEvents callbacks = function
                 (d, enabledEvents', passiveEvents',
@@ -283,12 +284,9 @@ let rec patch
            EventSet.empty, EventSet.empty, [], [])
           newDirectives
       in
-      directives >>? (
-        fun directives ->
-          for j = i to Array.length directives - 1 do
-            Array.get directives j |. cleanup
-          done
-      );
+      for j = i to Array.length directives - 1 do
+        Array.get directives j |. cleanup
+      done;
       updatedDirectives, insertionPoint, enabledEvents,
       passiveEvents, removeTransitions, callbacks
 
@@ -398,7 +396,7 @@ let rec patch
                   element
                   defaultNamespace
                   (notifier notify handler)
-                  (Some (arrayOf (unsafeDirective d)))
+                  (arrayOf (unsafeDirective d))
                   (view state |. arrayOf)
               in
               let d = ofArray result enabledEvents passiveEvents in
@@ -417,7 +415,7 @@ let rec patch
                 element
                 defaultNamespace
                 (notifier notify handler)
-                None
+                empty
                 (view state |. arrayOf)
             in
             let d = ofArray result enabledEvents passiveEvents in
@@ -454,7 +452,7 @@ let rec patch
             let updated, insertionPoint,
                 enabledEvents, passiveEvents, removeTransitions, callbacks =
               go1 false insertionPoint
-                enableRemoveTransitions None directives in
+                enableRemoveTransitions empty directives in
             let d =
               Array.mapi
                 (fun i directive -> (Array.get d i |. fst, directive))
@@ -489,9 +487,9 @@ let rec patch
                 go1 alwaysReorder
                   insertionPoint true (
                   if active && name = name' then
-                    (Some directives')
+                    directives'
                   else
-                    None
+                    empty
                 ) directives in (
                 RemoveTransition (name, updated, true),
                 enabledEvents,
@@ -513,7 +511,7 @@ let rec patch
                   enabledEvents, passiveEvents, removeTransitions, callbacks =
                 go1 alwaysReorder
                   insertionPoint false
-                  None directives in (
+                  empty directives in (
                 RemoveTransition (name, updated, true),
                 enabledEvents, passiveEvents,
                 insertionPoint,
@@ -585,8 +583,8 @@ let rec patch
             let d = fn state in
             let isNew, directives =
               match t with
-                Thunk (_, _, Some (d, _, _)) -> false, Some (arrayOf d)
-              | _ -> true, None
+                Thunk (_, _, Some (d, _, _)) -> false, arrayOf d
+              | _ -> true, empty
             in
             let result, insertionPoint,
                 enabledEvents, passiveEvents, removeTransitions, callbacks =
@@ -628,7 +626,7 @@ let rec patch
             else
               let directives, sibling,
                   enabledEvents, passiveEvents, removeTransitions, callbacks =
-                patch child namespace notify (Some oldDirectives) newDirectives
+                patch child namespace notify oldDirectives newDirectives
               in
               (Attached {
                   attached with
@@ -653,7 +651,7 @@ let rec patch
             let child = createElement namespace selector in
             insert element child insertionPoint;
             let directives, _, enabledEvents, passiveEvents, _, callbacks =
-              patch child namespace notify None newDirectives
+              patch child namespace notify empty newDirectives
             in
             let vnode = {
               element = child;
@@ -675,8 +673,8 @@ let rec patch
         )
       | Wedge (xs, _) ->
         let isNew, directives = match next with
-            Wedge (directives, _) -> false, Some directives
-          | _ -> true, None
+            Wedge (directives, _) -> false, directives
+          | _ -> true, empty
         in
         let updated, insertionPoint,
             enabledEvents, passiveEvents, removeTransitions, callbacks =
@@ -737,7 +735,7 @@ let rec patch
             element
             namespace
             notify
-            (Some directives)
+            directives
             directives
         in
         let callbacks = callbacks' @ callbacks in
@@ -843,11 +841,9 @@ let start ?namespace element view update state =
                   let directives = !r in
                   dispatch
                     check
-                    ev notify (
-                    match directives with
-                      Some directives -> directives
-                    | None -> empty
-                  ) (List.rev parents)
+                    ev notify
+                    directives
+                    (List.rev parents)
               in
               addEventListener target name f options;
               Array.set listeners i (Some f)
@@ -858,7 +854,7 @@ let start ?namespace element view update state =
   let patch =
     let rEnabled = ref EventSet.empty in
     let rPassive = ref EventSet.empty in
-    let rDirectives = ref None in
+    let rDirectives = ref empty in
     fun notify newDirectives ->
       let oldEnabledEvents = !rEnabled in
       let oldPassiveEvents = !rPassive in
@@ -868,7 +864,7 @@ let start ?namespace element view update state =
       in
       rEnabled := enabledEvents;
       rPassive := passiveEvents;
-      rDirectives := Some updatedDirectives;
+      rDirectives := updatedDirectives;
       register oldEnabledEvents enabledEvents rDirectives notify false;
       register oldPassiveEvents passiveEvents rDirectives notify true;
       List.iter (fun f -> f ()) callbacks
