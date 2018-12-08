@@ -211,5 +211,6 @@ end
 let () =
   let open Webapi.Dom in
   match Document.getElementById "container" document with
-    Some target -> mount target Todo.view Todo.update Todo.init
+    Some target ->
+    let _ = mount target Todo.view Todo.update Todo.init in ()
   | None -> ()

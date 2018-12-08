@@ -68,7 +68,8 @@ let view state = [|
 let () =
   let open Webapi.Dom in
   match Document.getElementById "container" document with
-    Some target -> mount target view update 0
+    Some target ->
+    let _ = mount target view update 0 in ()
   | None -> ()
 ```
 

@@ -876,11 +876,12 @@ let start ?namespace element view update state =
       let next = update !s notify message in
       if prev != next then (
         s := next;
-        go ()
+        go () |> ignore
       )
     in
     let node = view !s in
-    patch notify node
+    patch notify node;
+    notify
   in
   go ()
 

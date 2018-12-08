@@ -37,7 +37,8 @@ val mount :
   ?namespace:string ->
   Dom.element ->
   ('a -> 'b t array) ->
-  ('a -> ('b -> unit) -> 'b -> 'a) -> 'a -> unit
+  ('a -> ('b -> unit) -> 'b -> 'a) -> 'a ->
+  ('b -> unit)
 
 (** Bind event listener to the "abort" event. *)
 val onAbort : ('a, Dom.event) listener
