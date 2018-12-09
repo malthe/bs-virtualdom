@@ -22,19 +22,16 @@ external removeEventListener :
   "removeEventListener"
 [@@bs.send]
 
+external prepend : 'a Dom.node_like -> unit = ""
+[@@bs.send.pipe : Element.t]
+
 let addClassName element name = DomTokenList.add name (Element.classList element)
 let appendElement parent child = Element.appendChild child parent
-let appendNode parent child = Node.appendChild child parent
 let createTextNode text = Document.createTextNode text document
-let getElementById id = Document.getElementById id document
-let getProperty element = elementToDict element |> Js.Dict.get
-let getTagName = Element.tagName
-let getId = Element.id
-let getClassName = Element.className
 let insertBefore parent element reference =
   Element.insertBefore element reference parent |> ignore
-let nextElementSibling = Element.nextSibling
-let nextTextSibling = Text.nextSibling
+let nextSibling = Node.nextSibling
+let prepend parent child = prepend child parent
 let removeAttribute element name = Element.removeAttribute name element
 let removeAttributeNS element namespace name = Element.removeAttributeNS
     namespace name element

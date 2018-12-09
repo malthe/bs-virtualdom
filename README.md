@@ -261,3 +261,5 @@ When you're using this statically allocated signup button in your view code, the
    Possible related answer:
 
    - [Listen to `mousedown` instead of `click`](https://stackoverflow.com/questions/10652852/jquery-fire-click-before-blur-event)
+
+Note that in order to use this library, you may need to bundle a polyfill for the [`ParentNode.prepend`](https://developer.mozilla.org/en-US/docs/Web/API/ParentNode/prepend#Polyfill) method.
