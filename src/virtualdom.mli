@@ -15,7 +15,7 @@ val component :
   'b -> 'a t
 
 (** Include directive if condition is true. *)
-val cond : bool -> 'a t -> 'a t
+val cond : 'a t -> bool -> 'a t
 
 (** An empty array of directives *)
 val empty : 'a t array

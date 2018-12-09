@@ -915,7 +915,7 @@ module Export = struct
     fun handler state ->
       Component (view, handler, state, None)
 
-  let cond b directive = if b then directive else Skip
+  let cond directive b = if b then directive else Skip
 
   let empty = [||]
 

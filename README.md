@@ -129,9 +129,10 @@ You can mix and match directives; some affect the element itself such as `attr` 
 | `attr`             | Sets an attribute                 | `attr "href" "#"`                            |
 | `className`        | Sets a class name                 | `className ("field-" ^ name)`                |
 | `component`        | Inserts a component               | `component view handler state`               |
-| `cond`             | Conditionally use directive       | `cond hidden (className "hidden")`           |
+| `cond`             | Conditionally use directive       | `cond (className "hidden") hidden`           |
 | `h`                | Adds child                        | (See example above.)                         |
 | `keyed`            | Inserts multiple, keyed directive | `keyed children`                             |
+| `maybe`            | Optionally use directive          | `maybe f option`                             |
 | `prop`             | Sets a property                   | `prop "value" "42"`                          |
 | `removeTransition` | Adds a remove transition stage    | `removeTransition directives`                |
 | `style`            | Sets a style                      | `style ~important:true "border" "none"`      |

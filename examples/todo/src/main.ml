@@ -112,18 +112,12 @@ module Todo = struct
 
   let viewTask t =
     h "li" [|
-      cond t.completed (
-        className "completed"
-      );
-      cond t.editing (
-        className "editing"
-      );
+      cond (className "completed") t.completed;
+      cond (className "editing") t.editing;
       h "div.view" [|
         h "input.toggle" [|
           attr "type" "checkbox";
-          cond t.completed (
-            attr "checked" "";
-          );
+          cond (attr "checked" "") t.completed;
           onClick
             (fun _ -> Some (ToggleCompletion t.id))
         |];
@@ -198,12 +192,12 @@ module Todo = struct
           text (" " ^ (if remaining = 1 then "item" else "items") ^ " left")
         |]
       |];
-      cond (total - remaining > 0) (
+      cond (
         h "button.clear-completed" [|
           text "Clear completed";
           onClick (fun _ -> Some RemoveCompleted)
         |]
-      )
+      ) (total - remaining > 0);
     |]
   |]
 end
