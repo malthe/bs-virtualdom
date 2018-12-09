@@ -30,7 +30,7 @@ val h :
 val keyed : (Js.Dict.key * 'a t) array -> 'a t
 
 (** Include directive if condition is true. *)
-val maybe : 'c option -> ('c -> 'a t) -> 'a t
+val maybe : ('c -> 'a t) -> 'c option -> 'a t
 
 (** This function mounts the app on an existing DOM element. *)
 val mount :

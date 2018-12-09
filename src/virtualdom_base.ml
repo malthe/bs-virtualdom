@@ -922,7 +922,7 @@ module Export = struct
   let keyed array =
     Index array
 
-  let maybe opt f = match opt with
+  let maybe f = function
       Some x -> f x
     | None -> Skip
 
