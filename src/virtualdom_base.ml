@@ -11,11 +11,17 @@ external nodeOfText : Dom.text -> Dom.node = "%identity"
 
 let browserEvents = [|
   Abort;
+  BeforeCopy;
+  BeforeCut;
   BeforeInput;
+  BeforePaste;
   BeforeUnload;
   Blur;
   Change;
   Click;
+  ClipboardChange;
+  Copy;
+  Cut;
   DblClick;
   DragEnd;
   DragEnter;
@@ -38,6 +44,7 @@ let browserEvents = [|
   MouseMove;
   MouseOut;
   MouseUp;
+  Paste;
   PopState;
   ReadyStateChange;
   Resize;
@@ -889,6 +896,7 @@ let start ?namespace element view update state =
   go ()
 
 module Event = struct
+  let clipboard (f : Dom.clipboardEvent -> 'a) = eventListener f
   let drag (f : Dom.dragEvent -> 'a) = eventListener f
   let event (f: Dom.event -> 'a) = eventListener f
   let uiEvent (f: Dom.uiEvent -> 'a) = eventListener f
@@ -995,4 +1003,11 @@ module Export = struct
   let onUnhandledRejection ?passive:(passive=false) f = Event.event f UnhandledRejection passive
   let onUnload ?passive:(passive=false) f = Event.event f Unload passive
   let onWheel ?passive:(passive=false) f = Event.wheel f Wheel passive
+  let onBeforeCopy ?passive:(passive=false) f = Event.clipboard f BeforeCopy passive
+  let onBeforeCut ?passive:(passive=false) f = Event.clipboard f BeforeCut passive
+  let onBeforePaste ?passive:(passive=false) f = Event.clipboard f BeforePaste passive
+  let onCopy ?passive:(passive=false) f = Event.clipboard f Copy passive
+  let onCut ?passive:(passive=false) f = Event.clipboard f Cut passive
+  let onPaste ?passive:(passive=false) f = Event.clipboard f Paste passive
+  let onClipboardChange ?passive:(passive=false) f = Event.clipboard f ClipboardChange passive
 end

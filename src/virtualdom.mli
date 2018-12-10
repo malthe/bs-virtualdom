@@ -40,6 +40,27 @@ val mount :
   ('a -> ('b -> unit) -> 'b -> 'a) -> 'a ->
   ('b -> unit)
 
+(** Bind event listener to the "beforecopy" event. *)
+val onBeforeCopy : ('a, Dom.clipboardEvent) listener
+
+(** Bind event listener to the "beforecut" event. *)
+val onBeforeCut : ('a, Dom.clipboardEvent) listener
+
+(** Bind event listener to the "beforepaste" event. *)
+val onBeforePaste : ('a, Dom.clipboardEvent) listener
+
+(** Bind event listener to the "copy" event. *)
+val onCopy : ('a, Dom.clipboardEvent) listener
+
+(** Bind event listener to the "cut" event. *)
+val onCut : ('a, Dom.clipboardEvent) listener
+
+(** Bind event listener to the "paste" event. *)
+val onPaste : ('a, Dom.clipboardEvent) listener
+
+(** Bind event listener to the "clipboardchange" event. *)
+val onClipboardChange : ('a, Dom.clipboardEvent) listener
+
 (** Bind event listener to the "abort" event. *)
 val onAbort : ('a, Dom.event) listener
 

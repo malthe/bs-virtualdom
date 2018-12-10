@@ -1,10 +1,16 @@
 type event =
     Abort
+  | BeforeCopy
+  | BeforeCut
   | BeforeInput
+  | BeforePaste
   | BeforeUnload
   | Blur
   | Change
   | Click
+  | ClipboardChange
+  | Copy
+  | Cut
   | DblClick
   | DragEnd
   | DragEnter
@@ -27,6 +33,7 @@ type event =
   | MouseMove
   | MouseOut
   | MouseUp
+  | Paste
   | PopState
   | ReadyStateChange
   | RemoveChildren
@@ -50,11 +57,17 @@ type event =
 
 let eventName = function
     Abort -> Some "abort"
+  | BeforeCopy -> Some "beforecopy"
+  | BeforeCut -> Some "beforecut"
   | BeforeInput -> Some "beforeinput"
+  | BeforePaste -> Some "beforepaste"
   | BeforeUnload -> Some "beforeunload"
   | Blur -> Some "blur"
   | Change -> Some "change"
   | Click -> Some "click"
+  | ClipboardChange -> Some "clipboardchange"
+  | Copy -> Some "copy"
+  | Cut -> Some "cut"
   | DblClick -> Some "dblclick"
   | DragEnd -> Some "dragend"
   | DragEnter -> Some "dragenter"
@@ -77,6 +90,7 @@ let eventName = function
   | MouseMove -> Some "mousemove"
   | MouseOut -> Some "mouseout"
   | MouseUp -> Some "mouseup"
+  | Paste -> Some "paste"
   | PopState -> Some "popstate"
   | ReadyStateChange -> Some "readystatechange"
   | Resize -> Some "resize"
