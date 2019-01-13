@@ -1,5 +1,8 @@
 type event =
     Abort
+  | AnimationEnd
+  | AnimationIteration
+  | AnimationStart
   | BeforeCopy
   | BeforeCut
   | BeforeInput
@@ -57,6 +60,9 @@ type event =
 
 let eventName = function
     Abort -> Some "abort"
+  | AnimationEnd -> Some "animationend"
+  | AnimationIteration -> Some "animationiteration"
+  | AnimationStart -> Some "animationstart"
   | BeforeCopy -> Some "beforecopy"
   | BeforeCut -> Some "beforecut"
   | BeforeInput -> Some "beforeinput"

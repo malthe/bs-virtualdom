@@ -11,6 +11,9 @@ external nodeOfText : Dom.text -> Dom.node = "%identity"
 
 let browserEvents = [|
   Abort;
+  AnimationEnd;
+  AnimationIteration;
+  AnimationStart;
   BeforeCopy;
   BeforeCut;
   BeforeInput;
