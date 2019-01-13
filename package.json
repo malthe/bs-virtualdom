@@ -8,6 +8,9 @@
     "clean": "bsb -clean-world",
     "test": "exit 0"
   },
+  "files": [
+    "src/virtualdom*.ml*"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/malthe/bs-virtualdom.git"
