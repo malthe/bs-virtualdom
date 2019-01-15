@@ -1,5 +1,6 @@
 type event =
     Abort
+  | AnimationCancel
   | AnimationEnd
   | AnimationIteration
   | AnimationStart
@@ -60,6 +61,7 @@ type event =
 
 let eventName = function
     Abort -> Some "abort"
+  | AnimationCancel -> Some "animationcancel"
   | AnimationEnd -> Some "animationend"
   | AnimationIteration -> Some "animationiteration"
   | AnimationStart -> Some "animationstart"
