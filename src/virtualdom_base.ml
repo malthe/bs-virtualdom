@@ -114,10 +114,17 @@ let ofArray array enabledEvents passiveEvents =
 let insert parent child = function
     Some insertAfter -> (
       match nextSibling insertAfter with
-        Some sibling -> insertBefore parent child sibling
+        Some sibling ->
+        if not (strictly_equal_to child sibling) then
+          insertBefore parent child sibling
       | None -> appendElement parent child
     )
-  | None -> prepend parent child
+  | None ->
+    if not (
+        strictly_equal_to
+          (Webapi.Dom.Element.firstChild parent) child)
+    then
+      prepend parent child
 
 let rec insertNested parent directives reference =
   Array.fold_left

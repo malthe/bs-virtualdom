@@ -2,6 +2,9 @@
 
 In next release ...
 
+- Avoid reinserting a node into the exact same location which would
+  cause an input element to lose focus.
+
 - Added browser events `AnimationEnd`, `AnimationIteration`, and
   `AnimationStart`.
 
