@@ -1,6 +1,7 @@
 # Changes
 
-In next release ...
+1.0.3 (2019-02-22)
+------------------
 
 - Added optional `onRemove` argument to virtual nodes. If provided,
   this function is responsible for removing the DOM element. The
