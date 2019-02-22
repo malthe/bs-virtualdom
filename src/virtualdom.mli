@@ -24,6 +24,7 @@ val empty : 'a t array
 val h :
   ?namespace:string ->
   ?onInsert:(Dom.element -> 'a option) ->
+  ?onRemove:(Dom.element -> Dom.element -> unit) ->
   string -> 'a t array -> 'a t
 
 (** This function inserts an keyed array of directives. *)

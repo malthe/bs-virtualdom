@@ -250,13 +250,16 @@ let rec patch
       | Thunk (_, _, Some (d, _, _)) -> cleanup d
       | Attached vnode ->
         removeVNode
-          element
           vnode.element
           vnode.namespace
           vnode.directives
           (EventSet.contains RemoveSelf vnode.enabledEvents)
           (EventSet.contains RemoveChildren vnode.enabledEvents)
-          (fun () -> ())
+          (fun () -> (
+               match vnode.onRemove with
+                 Some f -> f
+               | None -> removeElement
+             ) element vnode.element)
       | Wedge (directives, _) ->
         let length = Array.length directives in
         for i = 0 to length - 1 do
@@ -627,7 +630,8 @@ let rec patch
       | Attached { detached = Some d } ->
         update alwaysReorder enableRemoveTransitions next insertAfter d
       | Attached _ -> simple Skip true
-      | Detached (namespace, selector, onInsert, newDirectives) as detached -> (
+      | Detached (namespace, selector, onInsert, onRemove, newDirectives)
+        as detached -> (
           match next with
             Attached ({
                 element = child;
@@ -654,7 +658,8 @@ let rec patch
                   element = child;
                   directives;
                   enabledEvents;
-                  passiveEvents
+                  passiveEvents;
+                  onRemove;
                 },
                EventSet.childEventToParent enabledEvents,
                passiveEvents,
@@ -682,6 +687,7 @@ let rec patch
               detached = Some detached;
               enabledEvents;
               passiveEvents;
+              onRemove;
             } in
             (Attached vnode,
              EventSet.childEventToParent enabledEvents,
@@ -725,14 +731,17 @@ let rec patch
                  if EventSet.contains RemoveSelf vnode.enabledEvents then
                    let () =
                      removeVNode
-                       parent
                        vnode.element
                        vnode.namespace
                        vnode.directives
                        true
                        (EventSet.contains RemoveChildren vnode.enabledEvents)
-                       rm in
-                   1
+                       (fun () -> (
+                            match vnode.onRemove with
+                              Some f -> f
+                            | None -> removeElement
+                          ) parent vnode.element; rm ())
+                   in 1
                  else (
                    if EventSet.contains RemoveChildren vnode.enabledEvents then
                      go vnode.element vnode.directives
@@ -791,22 +800,17 @@ let rec patch
       | None -> List.iter (fun f -> f ()) callbacks
 
     and removeVNode
-        parent
         child
         namespace
         directives
         removeSelf
         removeChildren
         callback =
-      let remove () =
-        removeElement parent child;
-        callback ()
-      in
       let next () =
         if removeSelf then
-          removeVNodeOwnTransition child namespace directives [remove]
+          removeVNodeOwnTransition child namespace directives [callback]
         else
-          remove ()
+          callback ()
       in
       if removeChildren then
         removeVNodeNested child directives next
@@ -940,8 +944,8 @@ module Export = struct
 
   let empty = [||]
 
-  let h ?namespace ?onInsert selector directives =
-    Detached (namespace, selector, onInsert, directives)
+  let h ?namespace ?onInsert ?onRemove selector directives =
+    Detached (namespace, selector, onInsert, onRemove, directives)
 
   let keyed array =
     Index array

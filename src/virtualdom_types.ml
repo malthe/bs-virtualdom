@@ -12,7 +12,9 @@ type 'a t =
   | ClassName of string
   | Detached of
       string option * string *
-      (Dom.element -> 'a option) option * 'a t array
+      (Dom.element -> 'a option) option *
+      (Dom.element -> Dom.element -> unit) option *
+      'a t array
   | EventListener :
       EventSet.t * bool * ('event Dom.event_like -> 'a option) -> 'a t
   | Index of (Js.Dict.key * 'a t) array
@@ -34,6 +36,7 @@ and 'a vnode = {
   detached : 'a t option;
   enabledEvents : EventSet.t;
   passiveEvents : EventSet.t;
+  onRemove : (Dom.element -> Dom.element -> unit) option;
 }
 
 type ('a, 'b) listener =

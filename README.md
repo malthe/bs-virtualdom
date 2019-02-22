@@ -86,6 +86,7 @@ The `h` function creates a vnode from a selector such as `"div#main.app-like"` a
 val h :
   ?namespace:string ->
   ?onInsert:(Dom.element -> 'a option) ->
+  ?onRemove:(Dom.element -> Dom.element -> unit) ->
   string ->
   'a directive array ->
   'a directive
