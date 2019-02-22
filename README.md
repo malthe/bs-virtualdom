@@ -168,6 +168,8 @@ The example above assumes that `Clicked of Dom.element` is a message that's unde
 
 Note that the event system uses the bubbling nature of browser events and attaches event listeners only to the mounted root element (lazily, when required). It uses an internal dispatching system to invoke the matching event handlers defined in the virtual tree.
 
+In addition, the `mount` function takes an optional `onPatch` argument which gives an opportunity to react to DOM changes resulting from a rendering pass.
+
 ## Transitions
 
 The library comes with support for staged remove transitions. Normally, the patch and diff algorithm simply removes elements that are no longer in the tree, but to improve the user experience, we often want to stage a transition first (or possibly multiple.)

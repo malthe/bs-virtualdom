@@ -815,7 +815,7 @@ let rec patch
     in
     go1 alwaysReorder insertAfter enableRemoveTransitions
 
-let start ?namespace element view update state =
+let start ?namespace ?onPatch element view update state =
   let listeners = Array.make (Array.length browserEvents) None in
   let register oldEvents newEvents r notify passive =
     if oldEvents != newEvents then
@@ -900,8 +900,10 @@ let start ?namespace element view update state =
         go () |> ignore
       )
     in
-    let node = view !s in
+    let state = !s in
+    let node = view state in
     patch notify node;
+    onPatch >>? (fun f -> f state);
     notify
   in
   go ()
