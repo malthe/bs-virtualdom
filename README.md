@@ -208,16 +208,15 @@ val component : ('b -> 'c directive) -> ('c -> 'a) -> 'b -> 'a directive
 ```
 That is, a component is a directive of type `'a` which takes a _view_ function returning a directive of type `'c`, a _handler_ function that does one-way translation from `'c` into `'a`, and finally, a _state_ parameter.
 
-Using the "same input, same output" philosophy, the component is only evaluated when the input changes (strict equality). Note that the _view_ function must remain constant.
+Using the "same input, same output" philosophy, the component is only evaluated when the input changes. Note that the _view_ function must remain constant.
 
-From Elm's documentation (adapted to OCaml):
+#### A note on equality
 
-> Note: When are two values “the same” though? To optimize for performance, we use JavaScript’s === operator behind the scenes:
->
-> * Structural equality is used for `int`, `float`, `string` and `bool`.
-> * Reference equality is used for records, lists, custom types, dictionaries, etc.
->
-> Structural equality means that 4 is the same as 4 no matter how you produced those values. Reference equality means the actual pointer in memory has to be the same. Using reference equality is always cheap O(1), even when the data structure has thousands or millions of entries. So this is mostly about making sure that using lazy will never slow your code down a bunch by accident. All the checks are super cheap!
+When are two values “the same” though?
+
+* The basic types are easy: `int`, `float`, `string`, `bool` – these all behave exactly as you would imagine.
+* Lists, records, and objects – these are compared using reference equality. In Javascript, this is the `===` operator, which as you probably know has virtually no performance cost.
+* Arrays and tuples – these are compared item by item using the same set of rules, recursively. Note that in both cases, we'll only attempt to make a comparison if the lengths are equal in the first place.
 
 ### Thunks
 

@@ -22,3 +22,33 @@ let fold_lefti f a b =
 let strictly_equal_to a b =
   let f : 'a -> 'a -> bool = [%raw fun a b -> "{return a === b}"] in
   f a (unsafe_identity b)
+
+let array_strictly_equal_to a b =
+  let length = Array.length a in
+  length == Array.length b && (
+    let rec go i =
+      if i = length then
+        true
+      else (
+        if not (
+            strictly_equal_to
+              (Array.get a i)
+              (Array.get b i)
+          )
+        then
+          false
+        else
+          go (i + 1)
+      )
+    in go 0
+  )
+
+let equal_to a b =
+  if strictly_equal_to a b then
+    true
+  else (
+    if Js.Array.isArray a && Js.Array.isArray b then
+      array_strictly_equal_to (unsafe_identity a) (unsafe_identity b)
+    else
+      false
+  )

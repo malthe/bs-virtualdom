@@ -402,7 +402,7 @@ let rec patch
             Component (view', _, state',
                        Some (d, enabledEvents, passiveEvents)) as component
             when strictly_equal_to view view' ->
-            if strictly_equal_to state state' then
+            if equal_to state state' then
               let insertAfter =
                 if alwaysReorder then
                   insertNested element [| d |] insertAfter
@@ -596,7 +596,7 @@ let rec patch
             ) as thunk
             when
               strictly_equal_to fn fn' &&
-              strictly_equal_to state state' ->
+              equal_to state state' ->
             let insertAfter =
               if alwaysReorder then
                 insertNested element [| d |] insertAfter
