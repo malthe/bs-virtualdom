@@ -1,6 +1,7 @@
 # Changes
 
-In next release ...
+1.0.4 (2019-03-08)
+------------------
 
 - Use item-by-item comparison for tuples and arrays in thunks and
   components.

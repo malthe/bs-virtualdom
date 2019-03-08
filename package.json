@@ -1,6 +1,6 @@
 {
   "name": "bs-virtualdom",
-  "version": "1.0.4-dev",
+  "version": "1.0.4",
   "description": "Virtual DOM library implemented in BuckleSript",
   "scripts": {
     "build": "bsb -make-world",
