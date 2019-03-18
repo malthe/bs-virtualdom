@@ -1,5 +1,10 @@
 # Changes
 
+In next release ...
+
+- Fix issue where nested remove transitions would not trigger when
+  appearing inside directives other than vnodes.
+
 1.0.4 (2019-03-08)
 ------------------
 

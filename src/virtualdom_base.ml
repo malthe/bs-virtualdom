@@ -712,112 +712,151 @@ let rec patch
          enabledEvents,
          passiveEvents,
          insertAfter, isNew, removeTransitions, callbacks)
-
-    and removeVNodeNested parent directives callback =
-      let count = ref 0 in
-      let rm () =
-        let i = !count - 1 in
-        if i = 0 then (
-          callback ();
-        ) else
-          count := i;
-      in
-      let rec go parent directives =
-        Array.fold_left
-          (fun count d ->
-             match d with
-               Attached vnode ->
-               count + (
-                 if EventSet.contains RemoveSelf vnode.enabledEvents then
-                   let () =
-                     removeVNode
-                       vnode.element
-                       vnode.namespace
-                       vnode.directives
-                       true
-                       (EventSet.contains RemoveChildren vnode.enabledEvents)
-                       (fun () -> (
-                            match vnode.onRemove with
-                              Some f -> f
-                            | None -> removeElement
-                          ) parent vnode.element; rm ())
-                   in 1
-                 else (
-                   if EventSet.contains RemoveChildren vnode.enabledEvents then
-                     go vnode.element vnode.directives
-                   else
-                     0
-                 )
-               )
-             | _ -> count
-          ) 0 directives
-      in
-      count := go parent directives
-
-    and removeVNodeOwnTransition
-        ?removeTransitions element namespace directives callbacks =
-      match eventName TransitionEnd with
-        Some name ->
-        let directives, _, enabledEvents, _, removeTransitions, callbacks' =
-          patch
-            ~enableRemoveTransitions:true
-            ?notifyRemoveTransitions:removeTransitions
-            element
-            namespace
-            notify
-            directives
-            directives
-        in
-        let callbacks = callbacks' @ callbacks in
-        let target = Webapi.Dom.Element.asEventTarget element in
-        let options = [%bs.obj {
-          capture = true;
-          passive = true;
-          once = false;
-        }] in
-        let r = ref None in
-        let handler event =
-          let property =
-            Webapi.Dom.TransitionEvent.propertyName
-              (unsafeEvent event)
-          in
-          if List.exists (
-              function
-                Some property' -> property = property'
-              | None -> true
-            ) removeTransitions
-          then
-            !r >>? fun f -> removeEventListener target name f options;
-            if EventSet.contains RemoveSelf enabledEvents then
-              removeVNodeOwnTransition
-                ~removeTransitions
-                element namespace directives callbacks
-            else
-              List.iter (fun f -> f ()) callbacks
-        in
-        addEventListener target name handler options;
-        r := Some handler
-      | None -> List.iter (fun f -> f ()) callbacks
-
-    and removeVNode
-        child
-        namespace
-        directives
-        removeSelf
-        removeChildren
-        callback =
-      let next () =
-        if removeSelf then
-          removeVNodeOwnTransition child namespace directives [callback]
-        else
-          callback ()
-      in
-      if removeChildren then
-        removeVNodeNested child directives next
-      else
-        next ()
     in
     go1 alwaysReorder insertAfter enableRemoveTransitions
+
+and removeVNodeChildren
+  : 'a. Dom.element -> 'a t array -> (unit -> unit) -> int =
+  fun parent directives callback ->
+    Array.fold_left
+      (fun count d ->
+         match d with
+           Attached vnode ->
+           count + (
+             if EventSet.contains RemoveSelf vnode.enabledEvents then
+               let () =
+                 removeVNode
+                   vnode.element
+                   vnode.namespace
+                   vnode.directives
+                   true
+                   (EventSet.contains RemoveChildren vnode.enabledEvents)
+                   (fun () -> (
+                        match vnode.onRemove with
+                          Some f -> f
+                        | None -> removeElement
+                      ) parent vnode.element; callback ())
+               in 1
+             else (
+               if EventSet.contains RemoveChildren vnode.enabledEvents then
+                 removeVNodeChildren vnode.element vnode.directives callback
+               else
+                 0
+             )
+           )
+         | Component (_, _, _, Some (d, events, _)) ->
+           if EventSet.contains RemoveSelf events ||
+              EventSet.contains RemoveChildren events then
+             count + removeVNodeChildren parent [| d |] callback
+           else
+             count
+         | Index array ->
+           count + removeVNodeChildren parent (Array.map snd array) callback
+         | Thunk (_, _, Some (d, events, _)) ->
+           if EventSet.contains RemoveSelf events ||
+              EventSet.contains RemoveChildren events then
+             count + removeVNodeChildren parent [| d |] callback
+           else
+             count
+         | Wedge (xs, Some (events, _)) ->
+           if EventSet.contains RemoveSelf events ||
+              EventSet.contains RemoveChildren events then
+             count + removeVNodeChildren parent xs callback
+           else
+             count
+         | _ -> count
+      ) 0 directives
+
+and removeVNodeNested
+  : 'a. Dom.element -> 'a t array -> (unit -> unit) -> unit =
+  fun parent directives callback ->
+    let count = ref 0 in
+    let rm () =
+      let i = !count - 1 in
+      if i = 0 then (
+        callback ();
+      ) else
+        count := i;
+    in
+    count := removeVNodeChildren parent directives rm
+
+and removeVNodeOwnTransition
+  : 'a. ?removeTransitions:string option list ->
+    Dom.element ->
+    string option ->
+    'a t array ->
+    (unit -> unit) list ->
+    unit =
+  fun ?removeTransitions element namespace directives callbacks ->
+    match eventName TransitionEnd with
+      Some name ->
+      let directives, _, enabledEvents, _, removeTransitions, callbacks' =
+        patch
+          ~enableRemoveTransitions:true
+          ?notifyRemoveTransitions:removeTransitions
+          element
+          namespace
+          (fun _ -> ())
+          directives
+          directives
+      in
+      let callbacks = callbacks' @ callbacks in
+      let target = Webapi.Dom.Element.asEventTarget element in
+      let options = [%bs.obj {
+        capture = true;
+        passive = true;
+        once = false;
+      }] in
+      let r = ref None in
+      let handler event =
+        let property =
+          Webapi.Dom.TransitionEvent.propertyName
+            (unsafeEvent event)
+        in
+        if List.exists (
+            function
+              Some property' -> property = property'
+            | None -> true
+          ) removeTransitions
+        then
+          !r >>? fun f -> removeEventListener target name f options;
+          if EventSet.contains RemoveSelf enabledEvents then
+            removeVNodeOwnTransition
+              ~removeTransitions
+              element namespace directives callbacks
+          else
+            List.iter (fun f -> f ()) callbacks
+      in
+      addEventListener target name handler options;
+      r := Some handler
+    | None -> List.iter (fun f -> f ()) callbacks
+
+and removeVNode
+  : 'b.
+      Dom.element ->
+    string option ->
+    'b t array ->
+    bool ->
+    bool ->
+    (unit -> unit) ->
+    unit =
+  fun
+    child
+    namespace
+    directives
+    removeSelf
+    removeChildren
+    callback ->
+    let next () =
+      if removeSelf then
+        removeVNodeOwnTransition child namespace directives [callback]
+      else
+        callback ()
+    in
+    if removeChildren then
+      removeVNodeNested child directives next
+    else
+      next ()
 
 let start ?namespace ?onPatch element view update state =
   let listeners = Array.make (Array.length browserEvents) None in
