@@ -1,6 +1,7 @@
 # Changes
 
-In next release ...
+1.0.5 (2019-03-19)
+------------------
 
 - Fix issue where nested remove transitions would not trigger when
   appearing inside directives other than vnodes.
