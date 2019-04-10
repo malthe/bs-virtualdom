@@ -167,7 +167,7 @@ onClick (
 ```
 The example above assumes that `Clicked of Dom.element` is a message that's understood by the update function.
 
-Note that the event system uses the bubbling nature of browser events and attaches event listeners only to the mounted root element (lazily, when required). It uses an internal dispatching system to invoke the matching event handlers defined in the virtual tree.
+Note that the event system uses the bubbling nature of browser events and attaches event listeners only to the mounted root element (lazily, when required). It uses an internal dispatching system to invoke the matching event handlers defined in the virtual tree. This has the important caveat that `stopPropagation` will not have any effect. In the situation where you need to sometimes "stop" the event chain from bubbling up, a workaround is to use `preventDefault` and `defaultPrevented` to communicate that an event has already been handled.
 
 In addition, the `mount` function takes an optional `onPatch` argument which gives an opportunity to react to DOM changes resulting from a rendering pass.
 
