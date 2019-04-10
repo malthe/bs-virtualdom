@@ -1,5 +1,7 @@
 open Virtualdom_events
 
+type ('a, 'b) handler = 'a Dom.event_like -> 'b option
+
 type 'a t =
     Attached of 'a vnode
   | Attribute of string option * string * string
@@ -15,8 +17,7 @@ type 'a t =
       (Dom.element -> 'a option) option *
       (Dom.element -> Dom.element -> unit) option *
       'a t array
-  | EventListener :
-      EventSet.t * bool * ('event Dom.event_like -> 'a option) -> 'a t
+  | EventListener : EventSet.t * bool * ('event, 'a) handler -> 'a t
   | Index of (Js.Dict.key * 'a t) array
   | Property of string * string
   | RemoveTransition of string option * 'a t array * bool

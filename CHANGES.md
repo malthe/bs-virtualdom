@@ -1,5 +1,10 @@
 # Changes
 
+In next release ...
+
+- Dispatch events to listeners closer to the target before those
+  higher up the tree.
+
 1.0.5 (2019-03-19)
 ------------------
 

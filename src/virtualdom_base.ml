@@ -4,6 +4,7 @@ open Virtualdom_events
 open Virtualdom_types
 
 external unsafeEvent : Dom.event -> 'a Dom.event_like = "%identity"
+external unsafeEventHandler : ('a, 'c) handler -> ('b, 'c) handler = "%identity"
 external unsafeDirective : 'a t -> 'b t = "%identity"
 external safeIdentity : 'a -> 'a = "%identity"
 external nodeOfElement : Dom.element -> Dom.node = "%identity"
@@ -162,9 +163,10 @@ let rec dispatch
     Dom.element list ->
     unit =
   fun check ev update directives children ->
-    Array.iter
-      (function
-          Attached {
+    Array.fold_left
+      (fun acc ->
+         function
+           Attached {
             directives;
             element;
             enabledEvents;
@@ -175,26 +177,32 @@ let rec dispatch
               x::xs when x == element ->
               dispatch check ev update directives xs
             | _ -> ()
-          )
+          );
+          acc
         | Component (_, handler, _, Some (d, enabledEvents, passiveEvents))
           when check enabledEvents passiveEvents ->
           let update = notifier update handler in
-          dispatch check ev update [| d |] children
+          dispatch check ev update [| d |] children;
+          acc
         | EventListener (event, passive, f)
           when check event (if passive then event else EventSet.empty) ->
-          f (unsafeEvent ev) >>?
-          update
+          (unsafeEventHandler f)::acc
         | Index array ->
           let directives = Array.map snd array in
-          dispatch check ev update directives children
+          dispatch check ev update directives children;
+          acc
         | Thunk (_, _, Some (d, enabledEvents, passiveEvents))
           when check enabledEvents passiveEvents ->
-          dispatch check ev update [| d |] children
+          dispatch check ev update [| d |] children;
+          acc
         | Wedge (directives, Some (enabledEvents, passiveEvents))
           when check enabledEvents passiveEvents ->
-          dispatch check ev update directives children
-        | _ -> ()
-      ) directives
+          dispatch check ev update directives children;
+          acc
+        | _ -> acc
+      ) [] directives
+    |> List.rev
+    |> List.iter (fun f -> f ev >>? update)
 
 let rec patch
   : 'a.
